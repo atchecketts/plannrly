@@ -19,7 +19,6 @@ class Shift extends Model
 
     protected $fillable = [
         'tenant_id',
-        'rota_id',
         'location_id',
         'department_id',
         'business_role_id',
@@ -46,11 +45,6 @@ class Shift extends Model
             'is_recurring' => 'boolean',
             'recurrence_rule' => 'array',
         ];
-    }
-
-    public function rota(): BelongsTo
-    {
-        return $this->belongsTo(Rota::class);
     }
 
     public function location(): BelongsTo
@@ -119,10 +113,26 @@ class Shift extends Model
         $end = $this->end_time;
 
         if ($start && $end) {
+            // Handle overnight shifts (end time is before start time)
+            if ($end->lt($start)) {
+                // Add 24 hours to end time for overnight calculation
+                return $start->diffInMinutes($end->copy()->addDay());
+            }
+
             return $start->diffInMinutes($end);
         }
 
         return 0;
+    }
+
+    public function isOvernightShift(): bool
+    {
+        return $this->start_time && $this->end_time && $this->end_time->lt($this->start_time);
+    }
+
+    public function getDurationHoursAttribute(): float
+    {
+        return round($this->duration_minutes / 60, 1);
     }
 
     public function getWorkingMinutesAttribute(): int
@@ -163,5 +173,39 @@ class Shift extends Model
     public function scopeForStatus($query, ShiftStatus $status)
     {
         return $query->where('status', $status);
+    }
+
+    public function scopeDraft($query)
+    {
+        return $query->where('status', ShiftStatus::Draft);
+    }
+
+    public function scopePublished($query)
+    {
+        return $query->where('status', ShiftStatus::Published);
+    }
+
+    public function scopeVisibleToUser($query, User $user)
+    {
+        if ($user->isEmployee()) {
+            return $query->where('status', '!=', ShiftStatus::Draft);
+        }
+
+        return $query;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === ShiftStatus::Draft;
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === ShiftStatus::Published;
+    }
+
+    public function canBePublished(): bool
+    {
+        return $this->isDraft();
     }
 }

@@ -46,11 +46,6 @@ class Location extends Model
         return $this->hasManyThrough(BusinessRole::class, Department::class);
     }
 
-    public function rotas(): HasMany
-    {
-        return $this->hasMany(Rota::class);
-    }
-
     public function shifts(): HasMany
     {
         return $this->hasMany(Shift::class);

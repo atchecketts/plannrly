@@ -51,8 +51,8 @@
                     @endif
                 </div>
                 <div class="mt-6">
-                    <a href="{{ route('rotas.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                        View all schedules<span aria-hidden="true"> &rarr;</span>
+                    <a href="{{ route('schedule.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                        View schedule<span aria-hidden="true"> &rarr;</span>
                     </a>
                 </div>
             </div>

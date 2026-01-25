@@ -6,7 +6,6 @@ use App\Enums\ShiftStatus;
 use App\Models\BusinessRole;
 use App\Models\Department;
 use App\Models\Location;
-use App\Models\Rota;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +22,6 @@ class ShiftFactory extends Factory
 
         return [
             'tenant_id' => Tenant::factory(),
-            'rota_id' => Rota::factory(),
             'location_id' => Location::factory(),
             'department_id' => Department::factory(),
             'business_role_id' => BusinessRole::factory(),
@@ -33,22 +31,12 @@ class ShiftFactory extends Factory
             'end_time' => sprintf('%02d:00', $startHour + $duration),
             'break_duration_minutes' => $duration >= 6 ? 30 : null,
             'notes' => null,
-            'status' => ShiftStatus::Scheduled,
+            'status' => ShiftStatus::Draft,
             'is_recurring' => false,
             'recurrence_rule' => null,
             'parent_shift_id' => null,
             'created_by' => null,
         ];
-    }
-
-    public function forRota(Rota $rota): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'tenant_id' => $rota->tenant_id,
-            'rota_id' => $rota->id,
-            'location_id' => $rota->location_id,
-            'department_id' => $rota->department_id,
-        ]);
     }
 
     public function forUser(User $user): static
@@ -59,7 +47,7 @@ class ShiftFactory extends Factory
         ]);
     }
 
-    public function assigned(User $user = null): static
+    public function assigned(?User $user = null): static
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => $user?->id ?? User::factory(),
@@ -101,6 +89,13 @@ class ShiftFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'start_time' => '22:00',
             'end_time' => '06:00',
+        ]);
+    }
+
+    public function published(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => ShiftStatus::Published,
         ]);
     }
 

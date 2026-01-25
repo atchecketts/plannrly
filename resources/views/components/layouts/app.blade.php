@@ -28,7 +28,7 @@
                     <span class="font-medium">Dashboard</span>
                 </a>
 
-                <a href="{{ route('rotas.index') }}" class="{{ request()->routeIs('rotas.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
+                <a href="{{ route('schedule.index') }}" class="{{ request()->routeIs('schedule.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -76,11 +76,11 @@
                     <span>Leave Requests</span>
                 </a>
 
-                <a href="{{ route('leave-types.index') }}" class="{{ request()->routeIs('leave-types.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
+                <a href="{{ route('shift-swaps.index') }}" class="{{ request()->routeIs('shift-swaps.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
-                    <span>Leave Types</span>
+                    <span>Shift Swaps</span>
                 </a>
             </nav>
 
@@ -92,7 +92,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-white truncate">{{ auth()->user()->full_name }}</p>
-                        <p class="text-xs text-gray-500 truncate">{{ auth()->user()->system_role->label() }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ auth()->user()->getHighestRole()?->label() ?? 'Employee' }}</p>
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf

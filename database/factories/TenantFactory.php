@@ -16,16 +16,12 @@ class TenantFactory extends Factory
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name) . '-' . fake()->unique()->numberBetween(1000, 9999),
+            'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1000, 9999),
             'email' => fake()->companyEmail(),
             'phone' => fake()->phoneNumber(),
             'address' => fake()->address(),
             'logo_path' => null,
-            'settings' => [
-                'timezone' => fake()->timezone(),
-                'date_format' => 'Y-m-d',
-                'time_format' => 'H:i',
-            ],
+            'settings' => null,
             'is_active' => true,
             'trial_ends_at' => null,
         ];

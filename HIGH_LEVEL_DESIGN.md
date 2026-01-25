@@ -14,9 +14,9 @@ Plannrly is a multi-tenant SaaS application for managing staff shifts, leave req
 |-------|------------|
 | Backend | Laravel 12 (PHP 8.5) |
 | Database | MySQL 8.x |
-| Frontend | Laravel Blade + Livewire |
+| Frontend | Laravel Blade + Alpine.js |
 | CSS Framework | Tailwind CSS v4 |
-| Calendar/Scheduling | FullCalendar.js or similar |
+| Interactive UI | Alpine.js 3.x (modals, drag-and-drop) |
 | Mobile | Progressive Web App (PWA) + dedicated mobile views |
 | Notifications | Laravel Notifications (Email, Database, Push) |
 | AI Integration | OpenAI API / Anthropic API |
@@ -251,30 +251,11 @@ UNIQUE: user_id + business_role_id
 
 ### 3.3 Scheduling Tables
 
-#### Rotas (Schedule Containers)
-```
-rotas
-├── id (PK)
-├── tenant_id (FK)
-├── location_id (FK, nullable - null means all locations)
-├── department_id (FK, nullable - null means all departments)
-├── name (e.g., "Week 1 - January 2024")
-├── start_date
-├── end_date
-├── status (enum: draft, published, archived)
-├── published_at
-├── published_by (FK to users)
-├── created_by (FK to users)
-├── created_at
-└── updated_at
-```
-
 #### Shifts
 ```
 shifts
 ├── id (PK)
 ├── tenant_id (FK)
-├── rota_id (FK)
 ├── location_id (FK)
 ├── department_id (FK)
 ├── business_role_id (FK)
@@ -284,7 +265,7 @@ shifts
 ├── end_time
 ├── break_duration_minutes (nullable)
 ├── notes
-├── status (enum: scheduled, in_progress, completed, missed, cancelled)
+├── status (enum: draft, published, in_progress, completed, missed, cancelled)
 ├── is_recurring
 ├── recurrence_rule (JSON, nullable - for recurring shifts)
 ├── parent_shift_id (FK, nullable - for recurring instances)
@@ -292,6 +273,16 @@ shifts
 ├── created_at
 └── updated_at
 ```
+
+**Shift Status Workflow:**
+- **Draft**: Newly created shifts are in draft status. Only visible to admins/managers.
+- **Published**: Shifts made visible to employees. Triggers notification if enabled.
+- **In Progress**: Shift has started (clock-in recorded)
+- **Completed**: Shift completed (clock-out recorded)
+- **Missed**: No clock-in after grace period
+- **Cancelled**: Shift cancelled
+
+**Note**: The schedule view is driven directly by shifts for a given date range. The schedule displays shifts grouped by week with navigation to previous/next weeks.
 
 #### Shift Recurrence Rule (JSON Structure)
 ```json
@@ -458,10 +449,9 @@ notification_preferences
 | Create users | ✓ | ✓ | In Location | In Dept | - |
 | Edit users | ✓ | ✓ | In Location | In Dept | - |
 | Assign system roles | ✓ | ✓ | Limited* | Limited* | - |
-| **Rota/Shift Management** |
-| View rotas | ✓ | All | In Location | In Dept | Own |
-| Create/Edit rotas | ✓ | ✓ | In Location | In Dept | - |
-| Publish rotas | ✓ | ✓ | In Location | In Dept | - |
+| **Schedule/Shift Management** |
+| View schedule | ✓ | All | In Location | In Dept | Own |
+| Create/Edit shifts | ✓ | ✓ | In Location | In Dept | - |
 | Assign shifts | ✓ | ✓ | In Location | In Dept | - |
 | **Leave Management** |
 | Request leave | - | ✓ | ✓ | ✓ | ✓ |
@@ -544,15 +534,23 @@ On Submit:
 6. Redirect to Admin Dashboard
 ```
 
-### 5.2 Shift Calendar Interface
+### 5.2 Schedule Interface
+
+The schedule system provides two views for managing shifts:
+- **Week View**: Default view showing 7 days with employees as rows
+- **Day View**: Detailed single-day view with timeline visualization
+
+**View Toggle**: Day | Week (toggle buttons in header)
+
+#### 5.2.1 Week View
+
+The week view displays shifts for a week at a time with navigation controls and cascading filters.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ◄ Previous Week     Week of Jan 15-21, 2024    Next Week ►│
+│  [Day|Week]   ◄ Prev   Week of Jan 15-21, 2024   Next ►    │
 ├─────────────────────────────────────────────────────────────┤
-│ Filters: [Location ▼] [Department ▼] [Role ▼] [User ▼]     │
-│ View:    [Day] [Week] [Month] [Timeline]                    │
-│ Status:  [Draft] ○ Published                                │
+│ Filters: [Location ▼] [Department ▼] [Role ▼] [Make Default]│
 ├─────────────────────────────────────────────────────────────┤
 │         │ Mon 15 │ Tue 16 │ Wed 17 │ Thu 18 │ Fri 19 │ ... │
 ├─────────┼────────┼────────┼────────┼────────┼────────┼─────┤
@@ -565,16 +563,119 @@ On Submit:
 │ ⚠ UNAS- │████████│████████│        │████████│████████│     │
 │ SIGNED  │ 6-2    │ 6-2    │        │ 6-2    │ 6-2    │     │
 └─────────────────────────────────────────────────────────────┘
-│ [+ Add Shift] [🤖 AI Assist] [📋 Copy Week] [📤 Publish]   │
+│ [+ Add Shift] [Publish All (X)]                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Drag & Drop Functionality:**
-- Drag shifts between days for same user
-- Drag shifts between users (same role)
-- Drag unassigned shifts to assign them
-- Drag to extend/shorten shift duration
-- Copy shifts with Ctrl+Drag
+#### 5.2.2 Day View
+
+The day view provides a timeline visualization for a single day with hours as columns.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [Day|Week]   ◄ Prev   Wednesday, Jan 15, 2024   Next ►    │
+├─────────────────────────────────────────────────────────────┤
+│ Filters: [Location ▼] [Department ▼] [Role ▼] [Make Default]│
+├─────────────────────────────────────────────────────────────┤
+│         │ 6 │ 7 │ 8 │ 9 │10 │11 │12 │13 │14 │15 │16 │17 │.│
+├─────────┼───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴──┤
+│ John D. │           ████████████████████                   │
+│ Cashier │            9:00 - 17:00                          │
+├─────────┼──────────────────────────────────────────────────┤
+│ Jane S. │                       ████████████████████       │
+│ Cashier │                        12:00 - 20:00             │
+├─────────┼──────────────────────────────────────────────────┤
+│ ⚠ UNAS- │   ████████████                                   │
+│ SIGNED  │    6:00 - 14:00                                  │
+└─────────────────────────────────────────────────────────────┘
+│ [+ Add Shift] [Publish All (X)]                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Day View Features:**
+- Timeline shows hours based on tenant settings (default: 6:00-22:00)
+- Shift blocks span across hour columns based on start/end time
+- Visual representation of shift duration and overlap detection
+- Same filtering and publishing capabilities as week view
+
+**Schedule Navigation:**
+- Previous/Next arrows to navigate between weeks (Week view) or days (Day view)
+- "Today" button jumps to current week/day
+- URL query parameter `?start=YYYY-MM-DD` for week view deep linking
+- URL query parameter `?date=YYYY-MM-DD` for day view deep linking
+- Today's column is visually highlighted
+- View toggle preserves the current date context when switching views
+
+**Cascading Filters:**
+- Location filter is always enabled
+- Department filter is disabled until Location is selected (shows "Select Location First")
+- Role filter is disabled until Department is selected (shows "Select Department First")
+- Selecting a location filters the department dropdown to show only departments in that location
+- Selecting a department filters the role dropdown to show only roles in that department
+- Filters also filter the employee list to show only matching employees
+
+**Filter Defaults:**
+- "Make Default" button saves the current filter selection as user preferences
+- Defaults are stored per-user and per-context (schedule, users, etc.)
+- On page load, user's saved defaults are automatically applied if available
+
+**Shift Interactions:**
+
+*Click Empty Cell to Create:*
+- Click the + placeholder on any empty cell to open the create modal
+- User and date are pre-populated from the clicked cell
+- Location and department are inherited from the employee's row
+- Default times: 09:00-17:00, break: 30 minutes
+- Role auto-selected from user's assigned roles in that department
+
+*Click Shift to Edit (Modal):*
+- Click any shift block to open the edit modal
+- Modal displays fields in cascading filter sequence:
+  1. **Location** - Select location first
+  2. **Department** - Filtered by selected location
+  3. **Role** - Filtered by selected department
+  4. **Employee** - Filtered to users who have the selected role (can be "Unassigned")
+  5. **Date** - Date picker for scheduling
+  6. **Start/End Time** - Time pickers
+  7. **Break Duration** - Minutes input
+  8. **Status** - Scheduled, Confirmed, Completed, Cancelled
+  9. **Notes** - Optional text
+- Cascading filters auto-select first available option when parent changes
+- Save updates the shift and reflects changes immediately in the grid (no page reload)
+- If employee or date changes, the shift block moves to the new cell in the grid
+- Shift block color updates to match the selected role's color
+- Delete button with confirmation removes the shift from the grid
+- Validation errors are displayed inline in the modal
+
+*Shift Block Display:*
+- Each shift block shows: Start Time - End Time, Role Name
+- Block color is based on the business role's color (or user's primary role color as fallback)
+- Role name is truncated if too long
+
+*Drag-and-Drop:*
+- Shift blocks are draggable (`draggable="true"`)
+- Drag shifts between users to reassign
+- Drag shifts between days to reschedule
+- Visual feedback: dragged shift becomes semi-transparent, target cell shows purple dashed outline
+- Drop updates the shift's `user_id` and/or `date` via API
+- Cannot drop on cells that already contain a shift (except unassigned row)
+- DOM updates immediately without page reload
+
+*Unassigned Shifts Row:*
+- The first row in the schedule displays shifts that have no employee assigned (`user_id = NULL`)
+- Row appears at the top of the grid with an amber color scheme
+- Shows count of unassigned shifts ("X shifts")
+- Click empty cell in unassigned row to create an unassigned shift
+- Unassigned row can contain multiple shifts per day cell (unlike employee rows)
+- Drag a shift from the unassigned row to an employee row to assign it
+- Drag a shift to the unassigned row to unassign it (remove employee assignment)
+- Shift blocks in unassigned row have an amber border to distinguish them
+- Count updates dynamically when shifts are moved to/from the unassigned row
+
+*Implementation:*
+- Uses Alpine.js for state management and DOM manipulation
+- Native HTML5 Drag and Drop API for shift movement
+- CSS classes: `.dragging` (opacity: 0.5), `.drag-over` (purple dashed outline)
 
 ### 5.3 AI-Assisted Scheduling
 
@@ -904,7 +1005,6 @@ Similar to Location Admin but further filtered to assigned department(s):
 |-------|------------|----------|
 | Shift assigned | Employee | Email, Push, In-app |
 | Shift updated | Employee | Email, Push, In-app |
-| Rota published | All affected employees | Email, Push, In-app |
 | Leave requested | Approvers (escalation) | Email, Push, In-app |
 | Leave approved/rejected | Employee | Email, Push, In-app |
 | Shift swap requested | Target employee | Email, Push, In-app |
@@ -1006,17 +1106,13 @@ DELETE /api/v1/users/{id}
 POST   /api/v1/users/{id}/roles
 DELETE /api/v1/users/{id}/roles/{roleId}
 
-Rotas:
-GET    /api/v1/rotas
-POST   /api/v1/rotas
-GET    /api/v1/rotas/{id}
-PUT    /api/v1/rotas/{id}
-DELETE /api/v1/rotas/{id}
-POST   /api/v1/rotas/{id}/publish
+Schedule:
+GET    /api/v1/schedule                    # Get shifts for date range (default: current week)
+GET    /api/v1/schedule?start=YYYY-MM-DD   # Get shifts starting from specific week
 
 Shifts:
-GET    /api/v1/rotas/{rotaId}/shifts
-POST   /api/v1/rotas/{rotaId}/shifts
+GET    /api/v1/shifts
+POST   /api/v1/shifts
 GET    /api/v1/shifts/{id}
 PUT    /api/v1/shifts/{id}
 DELETE /api/v1/shifts/{id}
@@ -1047,6 +1143,10 @@ POST   /api/v1/shift-swaps
 POST   /api/v1/shift-swaps/{id}/accept
 POST   /api/v1/shift-swaps/{id}/reject
 POST   /api/v1/shift-swaps/{id}/approve
+
+User Preferences:
+GET    /user/filter-defaults?filter_context=schedule  # Get saved filter defaults
+POST   /user/filter-defaults                          # Save filter defaults
 ```
 
 ---
@@ -1109,24 +1209,30 @@ Track all sensitive operations:
 
 ## 12. Implementation Phases
 
-### Phase 1: Foundation (MVP)
-1. Multi-tenant architecture setup
-2. User authentication & registration
-3. Tenant, Location, Department, Business Role CRUD
-4. User management with role assignments
-5. Basic shift creation and assignment
-6. Basic leave request workflow
+### Phase 1: Foundation (MVP) ✓ (Completed)
+1. Multi-tenant architecture setup ✓
+2. User authentication & registration ✓
+3. Tenant, Location, Department, Business Role CRUD ✓
+4. User management with role assignments ✓
+5. Basic shift creation and assignment ✓
+6. Basic leave request workflow ✓
 
-### Phase 2: Core Features
-1. Shift calendar with drag-and-drop
-2. Rota publishing workflow
-3. Leave management with balances
-4. Notification system
-5. Dashboard implementations
+### Phase 2: Core Features (In Progress)
+1. Shift calendar with drag-and-drop ✓ (implemented)
+2. Shift edit modal with inline updates ✓ (implemented)
+3. Week view schedule ✓ (implemented)
+4. Day view schedule ✓ (implemented)
+5. Draft/Publish workflow for shifts ✓ (implemented)
+6. Shift publish notifications ✓ (implemented)
+7. Cascading filters with save defaults ✓ (implemented)
+8. Unassigned shifts management ✓ (implemented)
+9. TenantSettings for per-tenant configuration ✓ (implemented)
+10. Leave management with balances (in progress)
+11. Dashboard implementations (basic implemented)
 
 ### Phase 3: Advanced Features
 1. Time tracking (clock in/out)
-2. Shift swap requests
+2. Shift swap requests ✓ (implemented)
 3. Recurring shifts
 4. Reports generation
 5. Mobile PWA optimization
@@ -1138,95 +1244,174 @@ Track all sensitive operations:
 4. Comprehensive testing
 5. Documentation
 
+### Deferred Features
+- **Month View**: Deferred for future implementation. May be revisited for overview/planning purposes.
+
 ---
 
-## 13. File Structure (Proposed)
+## 13. File Structure
+
+```
+app/
+├── Enums/
+│   ├── LeaveRequestStatus.php
+│   ├── ShiftStatus.php
+│   ├── SwapRequestStatus.php
+│   ├── SystemRole.php
+│   └── TimeEntryStatus.php
+├── Http/
+│   ├── Controllers/
+│   │   ├── Auth/
+│   │   │   ├── LoginController.php
+│   │   │   └── RegisterController.php
+│   │   ├── BusinessRoleController.php
+│   │   ├── Controller.php
+│   │   ├── DashboardController.php
+│   │   ├── DepartmentController.php
+│   │   ├── LeaveRequestController.php
+│   │   ├── LocationController.php
+│   │   ├── ScheduleController.php
+│   │   ├── ShiftController.php
+│   │   ├── ShiftSwapController.php
+│   │   ├── UserController.php
+│   │   └── UserFilterController.php
+│   ├── Middleware/
+│   │   ├── CheckSystemRole.php
+│   │   ├── EnsureSuperAdmin.php
+│   │   ├── EnsureTenantAccess.php
+│   │   └── SetTenantContext.php
+│   └── Requests/
+│       ├── Auth/
+│       ├── BusinessRole/
+│       ├── Department/
+│       ├── Leave/
+│       ├── Location/
+│       ├── Shift/
+│       └── User/
+├── Models/
+│   ├── BusinessRole.php
+│   ├── Department.php
+│   ├── LeaveAllowance.php
+│   ├── LeaveRequest.php
+│   ├── LeaveType.php
+│   ├── Location.php
+│   ├── NotificationPreference.php
+│   ├── Shift.php
+│   ├── ShiftSwapRequest.php
+│   ├── Tenant.php
+│   ├── TenantSettings.php          # Per-tenant configuration
+│   ├── TimeEntry.php
+│   ├── User.php
+│   ├── UserBusinessRole.php
+│   ├── UserFilterDefault.php
+│   └── UserRoleAssignment.php
+├── Notifications/
+│   └── ShiftPublishedNotification.php
+├── Observers/
+│   └── ShiftObserver.php
+├── Policies/
+│   ├── BusinessRolePolicy.php
+│   ├── DepartmentPolicy.php
+│   ├── LeaveRequestPolicy.php
+│   ├── LocationPolicy.php
+│   ├── ShiftPolicy.php
+│   ├── ShiftSwapPolicy.php
+│   ├── TenantPolicy.php
+│   └── UserPolicy.php
+├── Providers/
+│   └── AppServiceProvider.php
+├── Scopes/
+│   └── TenantScope.php
+└── Traits/
+    └── BelongsToTenant.php
+
+database/
+├── factories/
+│   ├── BusinessRoleFactory.php
+│   ├── DepartmentFactory.php
+│   ├── LeaveRequestFactory.php
+│   ├── LeaveTypeFactory.php
+│   ├── LocationFactory.php
+│   ├── ShiftFactory.php
+│   ├── TenantFactory.php
+│   ├── TenantSettingsFactory.php
+│   ├── TimeEntryFactory.php
+│   └── UserFactory.php
+├── migrations/
+└── seeders/
+    ├── DatabaseSeeder.php
+    ├── DemoDataSeeder.php
+    ├── LeaveTypeSeeder.php
+    └── TenantSeeder.php
+
+resources/
+├── css/
+├── js/
+└── views/
+    ├── auth/
+    ├── business-roles/
+    ├── components/
+    │   ├── layouts/
+    │   │   ├── app.blade.php
+    │   │   └── guest.blade.php
+    │   ├── logo.blade.php
+    │   └── shift-edit-modal.blade.php
+    ├── dashboard/
+    │   ├── admin.blade.php
+    │   ├── department-admin.blade.php
+    │   ├── employee.blade.php
+    │   ├── location-admin.blade.php
+    │   └── super-admin.blade.php
+    ├── departments/
+    ├── leave/
+    ├── locations/
+    ├── samples/
+    ├── schedule/
+    │   ├── index.blade.php         # Week view
+    │   └── day.blade.php           # Day view
+    ├── users/
+    └── welcome.blade.php
+
+routes/
+├── api.php
+├── console.php
+└── web.php
+
+tests/
+├── Feature/
+│   ├── Auth/
+│   │   ├── LoginTest.php
+│   │   └── RegistrationTest.php
+│   ├── LeaveRequestTest.php
+│   ├── LocationManagementTest.php
+│   └── TenantIsolationTest.php
+└── Unit/
+    ├── Enums/
+    │   └── SystemRoleTest.php
+    └── Models/
+        └── UserTest.php
+```
+
+### Future Additions (Phase 2+)
+
+The following directories will be added in later phases:
 
 ```
 app/
 ├── Console/
-│   └── Commands/
-├── Enums/
-│   ├── SystemRole.php
-│   ├── ShiftStatus.php
-│   ├── LeaveRequestStatus.php
-│   └── RotaStatus.php
-├── Events/
-│   ├── ShiftAssigned.php
-│   ├── RotaPublished.php
-│   └── LeaveRequestStatusChanged.php
-├── Http/
-│   ├── Controllers/
-│   │   ├── Api/
-│   │   │   └── V1/
-│   │   ├── Auth/
-│   │   ├── SuperAdmin/
-│   │   ├── Admin/
-│   │   ├── LocationAdmin/
-│   │   └── DepartmentAdmin/
-│   ├── Middleware/
-│   │   ├── EnsureTenantAccess.php
-│   │   └── CheckSystemRole.php
-│   └── Requests/
-├── Listeners/
-├── Models/
-│   ├── Tenant.php
-│   ├── User.php
-│   ├── Location.php
-│   ├── Department.php
-│   ├── BusinessRole.php
-│   ├── UserRoleAssignment.php
-│   ├── UserBusinessRole.php
-│   ├── Rota.php
-│   ├── Shift.php
-│   ├── TimeEntry.php
-│   ├── LeaveType.php
-│   ├── LeaveAllowance.php
-│   ├── LeaveRequest.php
-│   ├── ShiftSwapRequest.php
-│   └── NotificationPreference.php
-├── Notifications/
-├── Policies/
-├── Providers/
-├── Scopes/
-│   └── TenantScope.php
-└── Services/
+│   └── Commands/           # Custom Artisan commands (partially implemented)
+├── Events/                 # Domain events (ShiftAssigned, etc.)
+├── Listeners/              # Event listeners
+└── Services/               # Business logic services
     ├── ShiftSchedulingService.php
     ├── LeaveCalculationService.php
     └── AISchedulingService.php
-
-database/
-├── factories/
-├── migrations/
-└── seeders/
-    ├── DatabaseSeeder.php
-    ├── TenantSeeder.php
-    ├── SystemRoleSeeder.php
-    └── LeaveTypeSeeder.php
-
-resources/
-├── views/
-│   ├── layouts/
-│   ├── components/
-│   ├── superadmin/
-│   ├── admin/
-│   ├── location-admin/
-│   ├── department-admin/
-│   ├── employee/
-│   └── auth/
-├── css/
-└── js/
-
-routes/
-├── web.php
-├── api.php
-├── auth.php
-└── console.php
-
-tests/
-├── Feature/
-└── Unit/
 ```
+
+**Already Implemented:**
+- `app/Notifications/` - Notification classes (ShiftPublishedNotification)
+- `app/Observers/` - Model observers (ShiftObserver)
+- `app/Console/Commands/` - Console commands (AutoPublishDraftShiftsCommand, CheckMissedShiftsCommand)
 
 ---
 

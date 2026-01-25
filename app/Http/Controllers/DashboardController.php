@@ -59,7 +59,7 @@ class DashboardController extends Controller
             'on_duty_today' => Shift::where('tenant_id', $tenantId)
                 ->whereDate('date', today())
                 ->whereNotNull('user_id')
-                ->where('status', ShiftStatus::Scheduled)
+                ->where('status', ShiftStatus::Published)
                 ->count(),
             'pending_leave_requests' => LeaveRequest::where('tenant_id', $tenantId)
                 ->where('status', LeaveRequestStatus::Requested)
@@ -102,6 +102,7 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         $upcomingShifts = Shift::with(['location', 'department', 'businessRole'])
+            ->visibleToUser($user)
             ->where('user_id', $user->id)
             ->whereDate('date', '>=', today())
             ->orderBy('date')
@@ -109,7 +110,8 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        $thisWeekHours = Shift::where('user_id', $user->id)
+        $thisWeekHours = Shift::visibleToUser($user)
+            ->where('user_id', $user->id)
             ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
             ->get()
             ->sum('working_hours');

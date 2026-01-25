@@ -41,11 +41,6 @@ class Department extends Model
         return $this->hasMany(BusinessRole::class);
     }
 
-    public function rotas(): HasMany
-    {
-        return $this->hasMany(Rota::class);
-    }
-
     public function shifts(): HasMany
     {
         return $this->hasMany(Shift::class);

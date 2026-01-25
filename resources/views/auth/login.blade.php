@@ -57,6 +57,21 @@
                 <form class="space-y-5" action="{{ route('login') }}" method="POST">
                     @csrf
 
+                    @if ($errors->any())
+                        <div class="rounded-lg bg-red-500/10 border border-red-500/20 p-4">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-5 h-5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div class="text-sm text-red-400">
+                                    @foreach ($errors->all() as $error)
+                                        <p>{{ $error }}</p>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">Email address</label>
                         <input type="email" name="email" id="email" value="{{ old('email') }}" placeholder="you@company.com" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors">
@@ -77,7 +92,7 @@
                     </div>
 
                     <div class="flex items-center">
-                        <input type="checkbox" name="remember" id="remember" class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 rounded focus:ring-brand-500">
+                        <input type="checkbox" name="remember" id="remember" value="1" class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 rounded focus:ring-brand-500">
                         <label for="remember" class="ml-2 text-sm text-gray-400">Remember me for 30 days</label>
                     </div>
 

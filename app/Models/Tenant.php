@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Tenant extends Model
@@ -53,11 +54,6 @@ class Tenant extends Model
         return $this->hasMany(BusinessRole::class);
     }
 
-    public function rotas(): HasMany
-    {
-        return $this->hasMany(Rota::class);
-    }
-
     public function shifts(): HasMany
     {
         return $this->hasMany(Shift::class);
@@ -71,6 +67,11 @@ class Tenant extends Model
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function tenantSettings(): HasOne
+    {
+        return $this->hasOne(TenantSettings::class);
     }
 
     public function scopeActive($query)

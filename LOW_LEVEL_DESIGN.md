@@ -284,47 +284,11 @@
 
 ---
 
-#### rotas
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | BIGINT UNSIGNED | PK, AUTO_INCREMENT | Primary key |
-| tenant_id | BIGINT UNSIGNED | FK → tenants.id | Tenant reference |
-| location_id | BIGINT UNSIGNED | FK → locations.id, NULLABLE | Location scope |
-| department_id | BIGINT UNSIGNED | FK → departments.id, NULLABLE | Department scope |
-| name | VARCHAR(255) | NOT NULL | Rota name |
-| start_date | DATE | NOT NULL | Period start |
-| end_date | DATE | NOT NULL | Period end |
-| status | VARCHAR(255) | DEFAULT 'draft' | Enum: draft/published/archived |
-| published_at | TIMESTAMP | NULLABLE | Publication time |
-| published_by | BIGINT UNSIGNED | FK → users.id, NULLABLE | Publisher |
-| created_by | BIGINT UNSIGNED | FK → users.id, NULLABLE | Creator |
-| created_at | TIMESTAMP | NULLABLE | Creation timestamp |
-| updated_at | TIMESTAMP | NULLABLE | Last update timestamp |
-| deleted_at | TIMESTAMP | NULLABLE | Soft delete timestamp |
-
-**Indexes:**
-- PRIMARY KEY (id)
-- INDEX (tenant_id)
-- INDEX (location_id)
-- INDEX (department_id)
-- INDEX (status)
-- INDEX (start_date, end_date)
-
-**Foreign Keys:**
-- tenant_id → tenants(id) ON DELETE CASCADE
-- location_id → locations(id) ON DELETE SET NULL
-- department_id → departments(id) ON DELETE SET NULL
-- published_by → users(id) ON DELETE SET NULL
-- created_by → users(id) ON DELETE SET NULL
-
----
-
 #### shifts
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | BIGINT UNSIGNED | PK, AUTO_INCREMENT | Primary key |
 | tenant_id | BIGINT UNSIGNED | FK → tenants.id | Tenant reference |
-| rota_id | BIGINT UNSIGNED | FK → rotas.id | Parent rota |
 | location_id | BIGINT UNSIGNED | FK → locations.id | Location |
 | department_id | BIGINT UNSIGNED | FK → departments.id | Department |
 | business_role_id | BIGINT UNSIGNED | FK → business_roles.id | Required role |
@@ -334,7 +298,7 @@
 | end_time | TIME | NOT NULL | End time |
 | break_duration_minutes | INTEGER | NULLABLE | Break duration |
 | notes | TEXT | NULLABLE | Shift notes |
-| status | VARCHAR(255) | DEFAULT 'scheduled' | Shift status |
+| status | VARCHAR(255) | DEFAULT 'draft' | Shift status (draft, published, etc.) |
 | is_recurring | BOOLEAN | DEFAULT FALSE | Recurring flag |
 | recurrence_rule | JSON | NULLABLE | Recurrence config |
 | parent_shift_id | BIGINT UNSIGNED | FK → shifts.id, NULLABLE | Parent for recurring |
@@ -346,7 +310,6 @@
 **Indexes:**
 - PRIMARY KEY (id)
 - INDEX (tenant_id)
-- INDEX (rota_id)
 - INDEX (user_id)
 - INDEX (date)
 - INDEX (status)
@@ -354,7 +317,6 @@
 
 **Foreign Keys:**
 - tenant_id → tenants(id) ON DELETE CASCADE
-- rota_id → rotas(id) ON DELETE CASCADE
 - location_id → locations(id) ON DELETE CASCADE
 - department_id → departments(id) ON DELETE CASCADE
 - business_role_id → business_roles(id) ON DELETE CASCADE
@@ -548,18 +510,54 @@
 |--------|------|-------------|-------------|
 | id | BIGINT UNSIGNED | PK, AUTO_INCREMENT | Primary key |
 | user_id | BIGINT UNSIGNED | FK → users.id | User reference |
-| page | VARCHAR(255) | NOT NULL | Page identifier |
-| filters | JSON | NOT NULL | Saved filter config |
+| filter_context | VARCHAR(255) | NOT NULL | Context identifier (e.g., 'schedule', 'users') |
+| location_id | BIGINT UNSIGNED | FK → locations.id, NULLABLE | Default location filter |
+| department_id | BIGINT UNSIGNED | FK → departments.id, NULLABLE | Default department filter |
+| business_role_id | BIGINT UNSIGNED | FK → business_roles.id, NULLABLE | Default business role filter |
+| additional_filters | JSON | NULLABLE | Additional filter settings |
 | created_at | TIMESTAMP | NULLABLE | Creation timestamp |
 | updated_at | TIMESTAMP | NULLABLE | Last update timestamp |
 
 **Indexes:**
 - PRIMARY KEY (id)
-- UNIQUE (user_id, page)
+- UNIQUE (user_id, filter_context)
 - INDEX (user_id)
+- INDEX (location_id)
+- INDEX (department_id)
+- INDEX (business_role_id)
 
 **Foreign Keys:**
 - user_id → users(id) ON DELETE CASCADE
+- location_id → locations(id) ON DELETE SET NULL
+- department_id → departments(id) ON DELETE SET NULL
+- business_role_id → business_roles(id) ON DELETE SET NULL
+
+---
+
+#### tenant_settings
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | BIGINT UNSIGNED | PK, AUTO_INCREMENT | Primary key |
+| tenant_id | BIGINT UNSIGNED | FK → tenants.id, UNIQUE | Tenant reference |
+| enable_clock_in_out | BOOLEAN | DEFAULT TRUE | Enable time tracking |
+| enable_shift_acknowledgement | BOOLEAN | DEFAULT FALSE | Require shift acknowledgement |
+| day_starts_at | TIME | DEFAULT '06:00:00' | Day view timeline start |
+| day_ends_at | TIME | DEFAULT '22:00:00' | Day view timeline end |
+| week_starts_on | TINYINT | DEFAULT 1 | Week start day (0=Sun, 1=Mon) |
+| timezone | VARCHAR(255) | DEFAULT 'UTC' | Tenant timezone |
+| date_format | VARCHAR(255) | DEFAULT 'Y-m-d' | Date display format |
+| time_format | VARCHAR(255) | DEFAULT 'H:i' | Time display format |
+| missed_grace_minutes | INTEGER | DEFAULT 15 | Grace period for missed shifts |
+| notify_on_publish | BOOLEAN | DEFAULT TRUE | Send notifications on publish |
+| created_at | TIMESTAMP | NULLABLE | Creation timestamp |
+| updated_at | TIMESTAMP | NULLABLE | Last update timestamp |
+
+**Indexes:**
+- PRIMARY KEY (id)
+- UNIQUE (tenant_id)
+
+**Foreign Keys:**
+- tenant_id → tenants(id) ON DELETE CASCADE
 
 ---
 
@@ -570,12 +568,14 @@
 ```php
 class Tenant extends Model
 {
+    // Has One
+    public function tenantSettings(): HasOne
+
     // Has Many
     public function users(): HasMany
     public function locations(): HasMany
     public function departments(): HasMany
     public function businessRoles(): HasMany
-    public function rotas(): HasMany
     public function shifts(): HasMany
     public function leaveTypes(): HasMany
     public function leaveRequests(): HasMany
@@ -632,7 +632,6 @@ class Location extends Model
     // Has Many
     public function departments(): HasMany
     public function shifts(): HasMany
-    public function rotas(): HasMany
 
     // Accessors
     public function getFullAddressAttribute(): string
@@ -698,7 +697,6 @@ class Shift extends Model
 
     // Belongs To
     public function tenant(): BelongsTo
-    public function rota(): BelongsTo
     public function location(): BelongsTo
     public function department(): BelongsTo
     public function businessRole(): BelongsTo
@@ -714,10 +712,56 @@ class Shift extends Model
     // Accessors
     public function getDurationHoursAttribute(): float
     public function getIsAssignedAttribute(): bool
+
+    // Scopes
+    public function scopeDraft(Builder $query): Builder      // Where status = draft
+    public function scopePublished(Builder $query): Builder  // Where status = published
+    public function scopeVisibleToUser(Builder $query, User $user): Builder
+    // Employees see only published+ shifts; admins see all
 }
 ```
 
-### 2.7 LeaveRequest Model
+### 2.7 TenantSettings Model
+
+```php
+class TenantSettings extends Model
+{
+    use HasFactory;
+
+    // Casts
+    protected function casts(): array
+    {
+        return [
+            'enable_clock_in_out' => 'boolean',
+            'enable_shift_acknowledgement' => 'boolean',
+            'day_starts_at' => 'datetime:H:i:s',
+            'day_ends_at' => 'datetime:H:i:s',
+            'week_starts_on' => 'integer',
+            'missed_grace_minutes' => 'integer',
+            'notify_on_publish' => 'boolean',
+        ];
+    }
+
+    // Belongs To
+    public function tenant(): BelongsTo
+}
+```
+
+**TenantSettings Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| enable_clock_in_out | boolean | Enable time tracking features |
+| enable_shift_acknowledgement | boolean | Require employees to acknowledge shifts |
+| day_starts_at | time | Day view timeline start (default: 06:00) |
+| day_ends_at | time | Day view timeline end (default: 22:00) |
+| week_starts_on | integer | Day of week (0=Sunday, 1=Monday) |
+| timezone | string | Default timezone for tenant |
+| date_format | string | Date display format |
+| time_format | string | Time display format |
+| missed_grace_minutes | integer | Minutes after shift start before marking missed |
+| notify_on_publish | boolean | Send notifications when shifts are published |
+
+### 2.8 LeaveRequest Model
 
 ```php
 class LeaveRequest extends Model
@@ -748,6 +792,27 @@ class LeaveRequest extends Model
     public function calculateTotalDays(): float
     public function approve(User $reviewer, ?string $notes = null): void
     public function reject(User $reviewer, ?string $notes = null): void
+}
+```
+
+### 2.8 UserFilterDefault Model
+
+```php
+class UserFilterDefault extends Model
+{
+    // Casts
+    protected function casts(): array
+    {
+        return [
+            'additional_filters' => 'array',
+        ];
+    }
+
+    // Belongs To
+    public function user(): BelongsTo
+    public function location(): BelongsTo
+    public function department(): BelongsTo
+    public function businessRole(): BelongsTo
 }
 ```
 
@@ -873,7 +938,90 @@ enum SystemRole: string
 }
 ```
 
-### 4.2 Role Hierarchy
+### 4.2 Additional Enums
+
+#### ShiftStatus
+
+```php
+enum ShiftStatus: string
+{
+    case Draft = 'draft';
+    case Published = 'published';
+    case InProgress = 'in_progress';
+    case Completed = 'completed';
+    case Missed = 'missed';
+    case Cancelled = 'cancelled';
+
+    public function label(): string;
+    public function color(): string;
+    public function isActive(): bool;      // Returns true for Published, InProgress
+    public function isFinal(): bool;       // Returns true for Completed, Missed, Cancelled
+    public function isDraft(): bool;
+    public function isPublished(): bool;
+    public function isVisibleToEmployee(): bool;  // Returns true for non-draft statuses
+}
+```
+
+**Status Workflow:**
+```
+Draft → Published → InProgress → Completed
+                  └→ Missed
+                  └→ Cancelled
+```
+
+- **Draft**: Default status for new shifts. Hidden from employees.
+- **Published**: Visible to employees. Can be published individually or in bulk.
+- **InProgress**: Clock-in recorded.
+- **Completed**: Clock-out recorded.
+- **Missed**: No clock-in after grace period (configurable via TenantSettings).
+- **Cancelled**: Shift cancelled by admin.
+
+#### LeaveRequestStatus
+
+```php
+enum LeaveRequestStatus: string
+{
+    case Draft = 'draft';
+    case Requested = 'requested';
+    case Approved = 'approved';
+    case Rejected = 'rejected';
+
+    public function label(): string;
+    public function color(): string;
+}
+```
+
+#### SwapRequestStatus
+
+```php
+enum SwapRequestStatus: string
+{
+    case Pending = 'pending';
+    case Accepted = 'accepted';
+    case Rejected = 'rejected';
+    case Cancelled = 'cancelled';
+    case Approved = 'approved';
+
+    public function label(): string;
+    public function color(): string;
+}
+```
+
+#### TimeEntryStatus
+
+```php
+enum TimeEntryStatus: string
+{
+    case ClockedIn = 'clocked_in';
+    case OnBreak = 'on_break';
+    case ClockedOut = 'clocked_out';
+
+    public function label(): string;
+    public function color(): string;
+}
+```
+
+### 4.3 Role Hierarchy
 
 ```
 Level 0: SuperAdmin (Plannrly Staff Only)
@@ -887,7 +1035,7 @@ Level 3: DepartmentAdmin (Department-scoped)
 Level 4: Employee (Self-service only)
 ```
 
-### 4.3 Policy Implementation
+### 4.4 Policy Implementation
 
 #### LocationPolicy
 
@@ -985,7 +1133,7 @@ class LeaveRequestPolicy
 }
 ```
 
-### 4.4 Middleware Implementation
+### 4.5 Middleware Implementation
 
 #### CheckSystemRole Middleware
 
@@ -1021,6 +1169,77 @@ Route::middleware(['auth', 'role:super_admin,admin'])
     ->group(function () {
         Route::resource('locations', LocationController::class);
     });
+```
+
+#### EnsureSuperAdmin Middleware
+
+```php
+class EnsureSuperAdmin
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (!$request->user()?->isSuperAdmin()) {
+            abort(403, 'Access denied. Super Admin privileges required.');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+#### EnsureTenantAccess Middleware
+
+```php
+class EnsureTenantAccess
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (!$request->user()) {
+            return redirect()->route('login');
+        }
+
+        // SuperAdmin can access without tenant
+        if ($request->user()->isSuperAdmin()) {
+            return $next($request);
+        }
+
+        // Regular users must have a tenant
+        if (!$request->user()->tenant_id) {
+            abort(403, 'No tenant associated with this account.');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+#### SetTenantContext Middleware
+
+```php
+class SetTenantContext
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if ($request->user() && $request->user()->tenant_id) {
+            // Sets tenant context for the request
+            app()->instance('current_tenant_id', $request->user()->tenant_id);
+        }
+
+        return $next($request);
+    }
+}
+```
+
+**Middleware Registration (bootstrap/app.php):**
+
+```php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->alias([
+        'role' => CheckSystemRole::class,
+        'super_admin' => EnsureSuperAdmin::class,
+        'tenant' => EnsureTenantAccess::class,
+    ]);
+})
 ```
 
 ---
@@ -1078,7 +1297,6 @@ All tenant-scoped models use the `BelongsToTenant` trait:
 - Location
 - Department
 - BusinessRole
-- Rota
 - Shift
 - TimeEntry
 - LeaveType
@@ -1169,18 +1387,41 @@ Location::query()
 | PUT | /users/{user} | UserController@update | Update user |
 | DELETE | /users/{user} | UserController@destroy | Delete user |
 
-#### Rota Routes
+#### Schedule Routes
 
 | Method | URI | Controller | Description |
 |--------|-----|------------|-------------|
-| GET | /rotas | RotaController@index | List rotas |
-| GET | /rotas/create | RotaController@create | Create form |
-| POST | /rotas | RotaController@store | Store rota |
-| GET | /rotas/{rota} | RotaController@show | View schedule |
-| GET | /rotas/{rota}/edit | RotaController@edit | Edit form |
-| PUT | /rotas/{rota} | RotaController@update | Update rota |
-| DELETE | /rotas/{rota} | RotaController@destroy | Delete rota |
-| POST | /rotas/{rota}/publish | RotaController@publish | Publish rota |
+| GET | /schedule | ScheduleController@index | View weekly schedule (default: current week) |
+| GET | /schedule?start=YYYY-MM-DD | ScheduleController@index | View schedule for specific week |
+| GET | /schedule/day | ScheduleController@day | View daily schedule (default: today) |
+| GET | /schedule/day?date=YYYY-MM-DD | ScheduleController@day | View schedule for specific day |
+| GET | /schedule/draft-count | ScheduleController@draftCount | Get count of draft shifts (JSON) |
+| POST | /schedule/publish | ScheduleController@publishAll | Publish all draft shifts in date range |
+
+**Draft Count Response (JSON):**
+```json
+{ "count": 5 }
+```
+
+**Publish All Request:**
+```json
+{
+    "start_date": "2024-01-15",
+    "end_date": "2024-01-21",
+    "location_id": 1,        // optional filter
+    "department_id": 2,      // optional filter
+    "business_role_id": 3    // optional filter
+}
+```
+
+**Publish All Response (JSON):**
+```json
+{
+    "success": true,
+    "published_count": 5,
+    "message": "5 shift(s) published successfully."
+}
+```
 
 #### Shift Routes
 
@@ -1188,10 +1429,13 @@ Location::query()
 |--------|-----|------------|-------------|
 | GET | /shifts | ShiftController@index | List shifts |
 | POST | /shifts | ShiftController@store | Store shift |
+| GET | /shifts/{shift} | ShiftController@show | Get shift JSON (for modal) |
 | GET | /shifts/{shift}/edit | ShiftController@edit | Edit form |
 | PUT | /shifts/{shift} | ShiftController@update | Update shift |
 | DELETE | /shifts/{shift} | ShiftController@destroy | Delete shift |
 | POST | /shifts/{shift}/assign | ShiftController@assign | Assign user |
+| POST | /shifts/{shift}/publish | ShiftController@publish | Publish single shift |
+| GET | /shifts/{shift}/available-users | ShiftController@availableUsers | Get assignable users |
 
 #### Leave Request Routes
 
@@ -1202,6 +1446,32 @@ Location::query()
 | POST | /leave-requests | LeaveRequestController@store | Store request |
 | GET | /leave-requests/{leaveRequest} | LeaveRequestController@show | View request |
 | POST | /leave-requests/{leaveRequest}/review | LeaveRequestController@review | Approve/Reject |
+
+#### User Filter Preferences Routes
+
+| Method | URI | Controller | Description |
+|--------|-----|------------|-------------|
+| GET | /user/filter-defaults | UserFilterController@getDefault | Get user's saved filter defaults |
+| POST | /user/filter-defaults | UserFilterController@storeDefault | Save user's filter defaults |
+
+**Request Parameters (POST):**
+```json
+{
+  "filter_context": "schedule",
+  "location_id": 1,
+  "department_id": 2,
+  "business_role_id": 3
+}
+```
+
+**Response (GET):**
+```json
+{
+  "location_id": 1,
+  "department_id": 2,
+  "business_role_id": 3
+}
+```
 
 ### 6.2 API Routes (v1 - Placeholder)
 
@@ -1214,6 +1484,358 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
 ---
 
+## 6.3 Schedule Page UI Patterns
+
+### Schedule Navigation
+
+The schedule system uses URL query parameters for navigation:
+
+**Week View:**
+```
+/schedule                      → Current week (Monday to Sunday)
+/schedule?start=2024-01-15     → Week starting from specified Monday
+```
+
+**Day View:**
+```
+/schedule/day                  → Today
+/schedule/day?date=2024-01-15  → Specific date
+```
+
+**Week View Navigation:**
+- **Previous Arrow**: Subtracts 7 days from current start date
+- **Next Arrow**: Adds 7 days to current start date
+- **Today Button**: Resets to current week
+
+**Day View Navigation:**
+- **Previous Arrow**: Subtracts 1 day from current date
+- **Next Arrow**: Adds 1 day to current date
+- **Today Button**: Resets to today
+
+**View Toggle:**
+- Day/Week toggle buttons in the header
+- Switching views preserves date context (day within week)
+
+### Cascading Filter Behavior
+
+The schedule filters implement a hierarchical dependency pattern:
+
+```
+Location Filter (always enabled)
+    │
+    └─► Department Filter (disabled until location selected)
+            │
+            └─► Role Filter (disabled until department selected)
+```
+
+**Disabled State Styling:**
+```css
+.filter-select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #1f2937;
+}
+```
+
+**Placeholder Text States:**
+| Filter | When Enabled | When Disabled |
+|--------|--------------|---------------|
+| Location | "Select Location" | N/A (always enabled) |
+| Department | "Select Department" | "Select Location First" |
+| Role | "Select Role" | "Select Department First" |
+
+**JavaScript Filter Logic:**
+
+1. On Location change:
+   - Filter departments to those belonging to selected location
+   - Enable department dropdown
+   - Reset department and role selections
+   - Disable role dropdown
+
+2. On Department change:
+   - Filter roles to those belonging to selected department
+   - Enable role dropdown
+   - Reset role selection
+
+3. On any filter change:
+   - Filter visible employee rows based on selections
+   - Update shift visibility based on employee filter
+
+### Filter Defaults Persistence
+
+The "Make Default" button saves current filter state via AJAX:
+
+```javascript
+POST /user/filter-defaults
+{
+    filter_context: 'schedule',
+    location_id: selectedLocationId || null,
+    department_id: selectedDepartmentId || null,
+    business_role_id: selectedRoleId || null
+}
+```
+
+On page load, defaults are fetched and applied:
+
+```javascript
+GET /user/filter-defaults?filter_context=schedule
+```
+
+### Shift Edit Modal
+
+The schedule view includes an Alpine.js-powered modal for editing shifts in place.
+
+**Modal State Management:**
+
+```javascript
+editModal: {
+    isOpen: false,           // Modal visibility
+    isCreateMode: false,     // True = creating new shift, False = editing existing
+    loading: false,          // Fetching shift data
+    saving: false,           // Save in progress
+    deleting: false,         // Delete in progress
+    confirmDelete: false,    // Delete confirmation step
+    error: null,             // Error message
+    errors: {},              // Validation errors by field
+    shiftId: null,           // Current shift ID (null in create mode)
+    originalUserId: null,    // Original user for detecting changes
+    originalDate: null,      // Original date for detecting changes
+    shift: {                 // Form data (cascading filter order)
+        location_id, department_id,
+        business_role_id, user_id,
+        date, start_time, end_time,
+        break_duration_minutes, notes, status
+    }
+}
+```
+
+**Modal Workflow:**
+
+1. Click shift block → `editModal.open(shiftId)` called
+2. Fetch shift data from `GET /shifts/{id}` (JSON response)
+3. Populate form fields (location, department, role, employee cascade)
+4. On location change → filter departments → auto-select first
+5. On department change → filter roles → auto-select first
+6. On role change → filter employees → validate current selection
+7. On Save → `PUT /shifts/{id}` with form data
+8. On success → Update DOM in place, close modal
+9. On validation error → Display field errors
+10. On Delete → Confirm first, then `DELETE /shifts/{id}`
+
+**Cascading Filter Data:**
+
+```javascript
+const modalData = {
+    locations: [{ id, name }],
+    departments: [{ id, name, location_id }],
+    roles: [{ id, name, department_id }],
+    users: [{ id, name, role_ids: [] }]
+};
+
+// Filter functions:
+getAvailableDepartments()  // Filtered by location_id
+getAvailableRoles()        // Filtered by department_id
+getAvailableEmployees()    // Filtered by users who have the role
+
+// Cascade handlers:
+onLocationChange()   // Updates department, role, employee
+onDepartmentChange() // Updates role, employee
+onRoleChange()       // Validates employee selection
+```
+
+**Create Mode:**
+
+```javascript
+// Click empty cell to create new shift
+editModal.create(userId, date, locationId, departmentId)
+
+// State differences in create mode:
+editModal.isCreateMode = true
+editModal.shiftId = null
+
+// Save uses POST /shifts instead of PUT /shifts/{id}
+// After success, addShiftToDom() creates the shift block
+```
+
+**DOM Update Functions:**
+
+- `updateShiftInDom(shift)` - Updates times, role name, and block color in shift block
+- `moveShiftInDom(shift, originalUserId, originalDate)` - Moves shift block to new cell when user or date changes
+- `removeShiftFromDom(shiftId)` - Removes shift block, adds empty placeholder
+- `addShiftToDom(shift)` - Creates new shift block in cell, removes placeholder, attaches event listeners
+
+**Shift Block Display:**
+
+Each shift block in the schedule grid shows:
+- Times: `HH:MM - HH:MM` format
+- Role: Business role name (truncated with CSS `truncate` class)
+- Color: Block background uses `business_role.color` (falls back to user's primary role color)
+
+### Drag-and-Drop Implementation
+
+Native HTML5 Drag and Drop API for moving shifts between cells.
+
+**Shift Block Attributes:**
+
+```html
+<div class="shift-block"
+     data-shift-id="{{ $shift->id }}"
+     data-user-id="{{ $user->id }}"
+     data-date="{{ $dateStr }}"
+     draggable="true"
+     @dragstart="handleDragStart($event, {{ $shift->id }})"
+     @dragend="handleDragEnd($event)"
+     @click.stop="editModal.open({{ $shift->id }})">
+```
+
+**Schedule Cell (Drop Target) Attributes:**
+
+```html
+<div class="schedule-cell"
+     data-user-id="{{ $user->id }}"
+     data-date="{{ $dateStr }}"
+     @dragover.prevent
+     @dragenter="handleDragEnter($event)"
+     @dragleave="handleDragLeave($event)"
+     @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')">
+```
+
+**Handler Functions:**
+
+| Handler | Purpose |
+|---------|---------|
+| `handleDragStart` | Store shift ID, add `.dragging` class |
+| `handleDragEnd` | Remove `.dragging` class, clear state |
+| `handleDragEnter` | Add `.drag-over` class to target cell |
+| `handleDragLeave` | Remove `.drag-over` class when leaving |
+| `handleDrop` | Validate drop, call API, update DOM |
+
+**Drop Validation:**
+
+- Cannot drop on same cell (no change)
+- Cannot drop on cell with existing shift
+- API call: `PUT /shifts/{id}` with new `user_id` and `date`
+
+**CSS Classes:**
+
+```css
+.drag-over {
+    background-color: rgba(90, 48, 240, 0.2) !important;
+    outline: 2px dashed #5a30f0;
+    outline-offset: -2px;
+}
+
+.dragging {
+    opacity: 0.5;
+}
+```
+
+**DOM Manipulation on Successful Drop:**
+
+1. Remove placeholder from target cell
+2. Update shift element's `data-user-id` and `data-date`
+3. Move shift element to target cell
+4. Add placeholder to original cell
+
+### Publish Workflow
+
+The schedule includes a bulk publish feature for draft shifts.
+
+**Publish Button:**
+- Shows count of draft shifts in current view: "Publish All (X)"
+- Only visible to admins/managers (not employees)
+- Respects active filters (location, department, role)
+
+**Publish Process:**
+1. Click "Publish All (X)" button
+2. Confirmation modal shows count
+3. POST to `/schedule/publish` with date range and filters
+4. Backend updates all matching draft shifts to `published` status
+5. If `notify_on_publish` is enabled in TenantSettings, sends ShiftPublishedNotification to assigned employees
+6. Returns JSON with count of published shifts
+7. Frontend updates draft count display
+
+**Individual Publish:**
+- Shifts can also be published individually via the edit modal
+- POST to `/shifts/{id}/publish`
+
+**ShiftPublishedNotification:**
+- Sent to the assigned employee when their shift is published
+- Includes shift date, times, location, and role
+- Delivered via configured notification channels (email, database)
+
+### Unassigned Shifts Row
+
+The schedule view includes a dedicated row at the top for shifts that have no user assigned (`user_id = NULL`). This allows managers to:
+- See all unassigned shifts at a glance
+- Create unassigned shifts that need to be filled
+- Drag shifts from the unassigned row to assign them to employees
+- Drag assigned shifts to the unassigned row to unassign them
+
+**Controller Data:**
+
+```php
+// ScheduleController creates unassigned shifts lookup grouped by date
+$unassignedShiftsLookup = [];
+foreach ($shifts as $shift) {
+    if (! $shift->user_id) {
+        $dateStr = $shift->date->format('Y-m-d');
+        $unassignedShiftsLookup[$dateStr][] = $shift;
+    }
+}
+```
+
+**Row Display:**
+
+```html
+<div class="unassigned-row" data-user-id="">
+    <!-- Unassigned label with count -->
+    <div class="p-3">
+        <div class="text-amber-400">Unassigned</div>
+        <div class="text-amber-500/70">{{ $unassignedShifts }} shifts</div>
+    </div>
+
+    <!-- Day cells - can contain multiple shifts per cell -->
+    @foreach($weekDates as $date)
+        <div class="schedule-cell" data-user-id="" data-date="{{ $dateStr }}">
+            @foreach($unassignedShiftsLookup[$dateStr] ?? [] as $shift)
+                <!-- Shift block with amber border -->
+            @endforeach
+        </div>
+    @endforeach
+</div>
+```
+
+**Key Differences from Employee Rows:**
+
+| Feature | Employee Row | Unassigned Row |
+|---------|--------------|----------------|
+| `data-user-id` | Employee ID | Empty string |
+| Shifts per cell | Maximum 1 | Multiple allowed |
+| Container class | Direct in cell | `.space-y-1` wrapper |
+| Placeholder style | `border-gray-700` | `border-amber-700/50` |
+| Shift border | None | `border-amber-500/30` |
+
+**Drag-and-Drop Behavior:**
+
+- **Drop TO unassigned row**: Sets `user_id: null`, adds amber border to shift
+- **Drop FROM unassigned row**: Assigns user, removes amber border
+- **Multiple shifts**: Unassigned row can accept drops even if cell has existing shifts
+- **Count update**: `updateUnassignedCount()` called after any drag operation
+
+**Create Shift in Unassigned Row:**
+
+```javascript
+// Called when clicking empty cell in unassigned row
+editModal.create(null, date, locationId, departmentId)
+
+// userId = null triggers different role selection logic:
+// - For assigned: Find user's role in department
+// - For unassigned: Select first role in department
+```
+
+---
+
 ## 7. Event/Listener Architecture
 
 ### 7.1 Planned Events (Future Implementation)
@@ -1222,7 +1844,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 |-------|-------------|-----------|
 | ShiftAssigned | User assigned to shift | SendShiftNotification |
 | ShiftUpdated | Shift details changed | SendShiftUpdateNotification |
-| RotaPublished | Rota made visible | NotifyAffectedEmployees |
 | LeaveRequested | New leave request | NotifyApprovers |
 | LeaveApproved | Leave request approved | NotifyEmployee, UpdateCalendar |
 | LeaveRejected | Leave request rejected | NotifyEmployee |
@@ -1306,8 +1927,8 @@ LeaveRequest::factory()
 
 // ShiftFactory
 Shift::factory()
-    ->forRota($rota)
-    ->assigned($user)
+    ->forUser($user)
+    ->onDate(now())
     ->create();
 ```
 
@@ -1405,6 +2026,8 @@ Add to crontab:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2024-01-15 | Claude | Initial Phase 1 implementation |
+| 1.1.0 | 2025-01-25 | Claude | Added Day view, Draft/Publish workflow, TenantSettings, Notifications |
+| 1.2.0 | 2025-01-25 | Claude | Removed rotas table and consolidated migrations for fresh install |
 
 ---
 

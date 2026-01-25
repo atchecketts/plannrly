@@ -22,6 +22,11 @@ class ShiftPolicy
             return false;
         }
 
+        // Employees cannot view Draft shifts
+        if ($user->isEmployee() && $shift->isDraft()) {
+            return false;
+        }
+
         if ($shift->user_id === $user->id) {
             return true;
         }
@@ -67,6 +72,15 @@ class ShiftPolicy
 
     public function assign(User $user, Shift $shift): bool
     {
+        return $this->update($user, $shift);
+    }
+
+    public function publish(User $user, Shift $shift): bool
+    {
+        if (! $shift->canBePublished()) {
+            return false;
+        }
+
         return $this->update($user, $shift);
     }
 }

@@ -103,7 +103,7 @@ class User extends Authenticatable
 
     public function getInitialsAttribute(): string
     {
-        return strtoupper(substr($this->first_name, 0, 1) . substr($this->last_name, 0, 1));
+        return strtoupper(substr($this->first_name, 0, 1).substr($this->last_name, 0, 1));
     }
 
     public function hasSystemRole(SystemRole $role, ?int $locationId = null, ?int $departmentId = null): bool
@@ -143,6 +143,14 @@ class User extends Authenticatable
     public function isDepartmentAdmin(?int $departmentId = null): bool
     {
         return $this->hasSystemRole(SystemRole::DepartmentAdmin, departmentId: $departmentId);
+    }
+
+    public function isEmployee(): bool
+    {
+        return ! $this->isSuperAdmin()
+            && ! $this->isAdmin()
+            && ! $this->isLocationAdmin()
+            && ! $this->isDepartmentAdmin();
     }
 
     public function getHighestRole(): ?SystemRole

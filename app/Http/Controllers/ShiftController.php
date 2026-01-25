@@ -2,20 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ShiftStatus;
 use App\Http\Requests\Shift\StoreShiftRequest;
 use App\Http\Requests\Shift\UpdateShiftRequest;
-use App\Models\BusinessRole;
-use App\Models\Department;
-use App\Models\Location;
-use App\Models\Rota;
 use App\Models\Shift;
 use App\Models\User;
+use App\Notifications\ShiftPublishedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ShiftController extends Controller
 {
+    public function show(Shift $shift): JsonResponse
+    {
+        $this->authorize('view', $shift);
+
+        return response()->json([
+            'success' => true,
+            'shift' => $shift->load(['user', 'department', 'businessRole', 'location']),
+        ]);
+    }
+
     public function store(StoreShiftRequest $request): RedirectResponse|JsonResponse
     {
         $data = $request->validated();
@@ -102,18 +110,31 @@ class ShiftController extends Controller
         return response()->json($users);
     }
 
-    public function forRota(Rota $rota, Request $request): JsonResponse
+    public function publish(Shift $shift): RedirectResponse|JsonResponse
     {
-        $shifts = Shift::with(['user', 'department', 'businessRole'])
-            ->where('rota_id', $rota->id)
-            ->when($request->input('location_id'), fn ($q, $v) => $q->where('location_id', $v))
-            ->when($request->input('department_id'), fn ($q, $v) => $q->where('department_id', $v))
-            ->when($request->input('business_role_id'), fn ($q, $v) => $q->where('business_role_id', $v))
-            ->when($request->input('user_id'), fn ($q, $v) => $q->where('user_id', $v))
-            ->orderBy('date')
-            ->orderBy('start_time')
-            ->get();
+        $this->authorize('publish', $shift);
 
-        return response()->json($shifts);
+        $shift->update(['status' => ShiftStatus::Published]);
+
+        // Send notification if shift is assigned and notifications are enabled
+        $tenant = auth()->user()->tenant;
+        $notifyOnPublish = $tenant->tenantSettings?->notify_on_publish ?? true;
+
+        if ($notifyOnPublish && $shift->user) {
+            $shift->load('location');
+            $shift->user->notify(new ShiftPublishedNotification($shift));
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'shift' => $shift->fresh(['user', 'department', 'businessRole']),
+                'message' => 'Shift published successfully.',
+            ]);
+        }
+
+        return redirect()
+            ->back()
+            ->with('success', 'Shift published successfully.');
     }
 }

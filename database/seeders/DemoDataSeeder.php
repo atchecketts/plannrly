@@ -2,14 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Enums\RotaStatus;
 use App\Enums\ShiftStatus;
 use App\Enums\SystemRole;
 use App\Models\BusinessRole;
 use App\Models\Department;
-use App\Models\LeaveType;
 use App\Models\Location;
-use App\Models\Rota;
 use App\Models\Shift;
 use App\Models\Tenant;
 use App\Models\User;
@@ -194,19 +191,6 @@ class DemoDataSeeder extends Seeder
         }
 
         $startOfWeek = Carbon::now()->startOfWeek();
-        $endOfWeek = Carbon::now()->endOfWeek();
-
-        $rota = Rota::create([
-            'tenant_id' => $tenant->id,
-            'location_id' => $downtown->id,
-            'name' => 'Week of ' . $startOfWeek->format('M d, Y'),
-            'start_date' => $startOfWeek,
-            'end_date' => $endOfWeek,
-            'status' => RotaStatus::Published,
-            'published_at' => now(),
-            'published_by' => $admin->id,
-            'created_by' => $admin->id,
-        ]);
 
         $shifts = [
             [$employees[0], $barista, '06:00', '14:00'],
@@ -223,7 +207,6 @@ class DemoDataSeeder extends Seeder
                 foreach ($shifts as [$user, $role, $start, $end]) {
                     Shift::create([
                         'tenant_id' => $tenant->id,
-                        'rota_id' => $rota->id,
                         'location_id' => $downtown->id,
                         'department_id' => $role->department_id,
                         'business_role_id' => $role->id,
@@ -232,7 +215,7 @@ class DemoDataSeeder extends Seeder
                         'start_time' => $start,
                         'end_time' => $end,
                         'break_duration_minutes' => 30,
-                        'status' => ShiftStatus::Scheduled,
+                        'status' => ShiftStatus::Published,
                         'created_by' => $admin->id,
                     ]);
                 }
@@ -240,7 +223,6 @@ class DemoDataSeeder extends Seeder
 
             Shift::create([
                 'tenant_id' => $tenant->id,
-                'rota_id' => $rota->id,
                 'location_id' => $downtown->id,
                 'department_id' => $frontDesk->id,
                 'business_role_id' => $barista->id,
@@ -249,7 +231,7 @@ class DemoDataSeeder extends Seeder
                 'start_time' => '10:00',
                 'end_time' => '18:00',
                 'break_duration_minutes' => 30,
-                'status' => ShiftStatus::Scheduled,
+                'status' => ShiftStatus::Published,
                 'created_by' => $admin->id,
             ]);
         }

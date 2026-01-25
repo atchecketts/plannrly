@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('shifts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('rota_id')->constrained()->cascadeOnDelete();
             $table->foreignId('location_id')->constrained()->cascadeOnDelete();
             $table->foreignId('department_id')->constrained()->cascadeOnDelete();
             $table->foreignId('business_role_id')->constrained()->cascadeOnDelete();
@@ -21,7 +20,7 @@ return new class extends Migration
             $table->time('end_time');
             $table->unsignedSmallInteger('break_duration_minutes')->nullable();
             $table->text('notes')->nullable();
-            $table->string('status')->default('scheduled');
+            $table->string('status')->default('draft');
             $table->boolean('is_recurring')->default(false);
             $table->json('recurrence_rule')->nullable();
             $table->foreignId('parent_shift_id')->nullable()->constrained('shifts')->nullOnDelete();
@@ -30,7 +29,6 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index('tenant_id');
-            $table->index('rota_id');
             $table->index('user_id');
             $table->index(['tenant_id', 'date']);
             $table->index(['tenant_id', 'user_id', 'date']);
