@@ -116,4 +116,31 @@ class LeaveRequestController extends Controller
             ->route('leave-requests.index')
             ->with('success', 'Leave request cancelled.');
     }
+
+    public function myRequests(): View
+    {
+        $user = auth()->user();
+
+        $leaveRequests = LeaveRequest::with(['leaveType', 'reviewedBy'])
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $pendingRequests = $leaveRequests->filter(
+            fn ($request) => $request->status === LeaveRequestStatus::Requested
+        );
+
+        $upcomingApproved = LeaveRequest::with(['leaveType'])
+            ->where('user_id', $user->id)
+            ->where('status', LeaveRequestStatus::Approved)
+            ->where('start_date', '>=', today())
+            ->orderBy('start_date')
+            ->get();
+
+        return view('my-leave.index', [
+            'leaveRequests' => $leaveRequests,
+            'pendingRequests' => $pendingRequests,
+            'upcomingApproved' => $upcomingApproved,
+        ]);
+    }
 }

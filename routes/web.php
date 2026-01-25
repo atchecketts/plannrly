@@ -7,9 +7,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MyShiftsController;
+use App\Http\Controllers\MySwapsController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapController;
+use App\Http\Controllers\TimeClockController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserFilterController;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +74,24 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::post('user/filter-defaults', [UserFilterController::class, 'storeDefault'])->name('user.filter-defaults.store');
     Route::get('user/filter-defaults', [UserFilterController::class, 'getDefault'])->name('user.filter-defaults.show');
+
+    // Employee Mobile Routes
+    Route::get('my-shifts', [MyShiftsController::class, 'index'])->name('my-shifts.index');
+
+    Route::get('time-clock', [TimeClockController::class, 'index'])->name('time-clock.index');
+    Route::post('time-clock/clock-in', [TimeClockController::class, 'clockIn'])->name('time-clock.clock-in');
+    Route::post('time-clock/clock-out', [TimeClockController::class, 'clockOut'])->name('time-clock.clock-out');
+    Route::post('time-clock/start-break', [TimeClockController::class, 'startBreak'])->name('time-clock.start-break');
+    Route::post('time-clock/end-break', [TimeClockController::class, 'endBreak'])->name('time-clock.end-break');
+
+    Route::get('my-swaps', [MySwapsController::class, 'index'])->name('my-swaps.index');
+    Route::get('my-swaps/create/{shift}', [MySwapsController::class, 'create'])->name('my-swaps.create');
+    Route::post('my-swaps', [MySwapsController::class, 'store'])->name('my-swaps.store');
+
+    Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::get('my-leave', [LeaveRequestController::class, 'myRequests'])->name('my-leave.index');
 });
 
 Route::prefix('samples')->group(function () {

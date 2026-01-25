@@ -595,11 +595,13 @@ class User extends Authenticatable
     // Has Many
     public function roleAssignments(): HasMany
     public function businessRoles(): BelongsToMany
+    public function userBusinessRoles(): HasMany
     public function shifts(): HasMany
     public function timeEntries(): HasMany
     public function leaveRequests(): HasMany
     public function leaveAllowances(): HasMany
     public function notificationPreferences(): HasMany
+    public function filterDefaults(): HasMany
 
     // Accessors
     public function getFullNameAttribute(): string
@@ -610,13 +612,30 @@ class User extends Authenticatable
     public function isAdmin(): bool
     public function isLocationAdmin(?int $locationId = null): bool
     public function isDepartmentAdmin(?int $departmentId = null): bool
+    public function isEmployee(): bool
     public function getHighestRole(): ?SystemRole
     public function canManageLocation(Location $location): bool
     public function canManageDepartment(Department $department): bool
 
     // Scopes
     public function scopeActive(Builder $query): Builder
+    public function scopeForTenant(Builder $query, int $tenantId): Builder
 }
+```
+
+**Important Note on Departments:**
+Users do NOT have a direct `departments` relationship. To access a user's departments, use the business roles relationship:
+
+```php
+// Eager load departments through business roles
+$user->load(['businessRoles.department']);
+
+// Get departments collection
+$departments = $user->businessRoles->map(fn($role) => $role->department)->filter()->unique('id');
+
+// Get primary role's department
+$primaryRole = $user->businessRoles->firstWhere('pivot.is_primary', true);
+$department = $primaryRole?->department;
 ```
 
 ### 2.3 Location Model
@@ -1013,12 +1032,16 @@ enum SwapRequestStatus: string
     case Accepted = 'accepted';
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';
-    case Approved = 'approved';
 
     public function label(): string;
     public function color(): string;
+    public function isPending(): bool;
+    public function isFinal(): bool;       // Returns true for Accepted, Rejected, Cancelled
+    public function canBeCancelled(): bool; // Returns true for Pending
 }
 ```
+
+**Note:** SwapRequestStatus uses `Accepted` (not `Approved`) for the accepted state. This distinguishes between employee acceptance and optional manager approval workflows.
 
 #### TimeEntryStatus
 
@@ -2091,6 +2114,206 @@ Add to crontab:
 | 1.1.0 | 2025-01-25 | Claude | Added Day view, Draft/Publish workflow, TenantSettings, Notifications |
 | 1.2.0 | 2025-01-25 | Claude | Removed rotas table and consolidated migrations for fresh install |
 | 1.3.0 | 2025-01-25 | Claude | Added Group By feature, shift overlap validation, bookmark for day view |
+| 1.4.0 | 2025-01-25 | Claude | Mobile Implementation Phase 1: Layout Foundation, Controllers, Views |
+| 1.5.0 | 2025-01-25 | Claude | Mobile Implementation Phase 2: Enhanced Employee Dashboard |
+| 1.6.0 | 2025-01-25 | Claude | Mobile Implementation Phases 3-8: Complete mobile functionality |
+| 1.6.1 | 2025-01-25 | Claude | Bug fixes: Fixed User-Department relationships, corrected SwapRequestStatus enum usage |
+
+---
+
+---
+
+## 11. Mobile Implementation
+
+### 11.1 Mobile Layout Foundation (Phase 1)
+
+The mobile interface provides a touch-friendly, responsive experience for employees using smartphones. The layout uses a dedicated mobile layout component with bottom navigation.
+
+**Mobile Layout Component:**
+
+```php
+// resources/views/components/layouts/mobile.blade.php
+@props(['title', 'active' => 'home', 'showHeader' => true, 'headerTitle' => null])
+```
+
+**Key Features:**
+- Maximum width container (`max-w-md`) for optimal mobile viewing
+- Viewport meta tag with `maximum-scale=1.0, user-scalable=no` for PWA-like behavior
+- Safe area inset support for devices with notches
+- Bottom navigation with 5 main sections
+- Branded header with user avatar and greeting
+
+### 11.2 Mobile Routes
+
+| Method | URI | Controller | Description |
+|--------|-----|------------|-------------|
+| GET | /my-shifts | MyShiftsController@index | View employee's weekly shifts |
+| GET | /time-clock | TimeClockController@index | Time clock interface |
+| POST | /time-clock/clock-in | TimeClockController@clockIn | Clock in for shift |
+| POST | /time-clock/clock-out | TimeClockController@clockOut | Clock out from shift |
+| POST | /time-clock/start-break | TimeClockController@startBreak | Start break |
+| POST | /time-clock/end-break | TimeClockController@endBreak | End break |
+| GET | /my-swaps | MySwapsController@index | View swap requests |
+| GET | /my-swaps/create/{shift} | MySwapsController@create | Create swap request form |
+| POST | /my-swaps | MySwapsController@store | Submit swap request |
+| GET | /profile | ProfileController@show | View/edit profile |
+| PUT | /profile | ProfileController@update | Update profile |
+| GET | /my-leave | LeaveRequestController@myRequests | View employee's leave requests |
+
+### 11.3 Mobile Controllers
+
+#### MyShiftsController
+
+Displays employee's shifts grouped by date for the current week with navigation.
+
+```php
+class MyShiftsController extends Controller
+{
+    public function index(Request $request): View
+    {
+        // Uses visibleToUser() scope - only shows published shifts
+        // Groups shifts by date
+        // Calculates total hours and shift count for week
+    }
+}
+```
+
+**Query Parameters:**
+- `start` - Start date for week view (default: start of current week)
+
+#### TimeClockController
+
+Handles time tracking with clock in/out and break management.
+
+```php
+class TimeClockController extends Controller
+{
+    public function index(): View
+    {
+        // Shows today's shift and active time entry
+        // Displays worked minutes today
+    }
+
+    public function clockIn(Request $request): RedirectResponse|JsonResponse
+    {
+        // Creates TimeEntry with ClockedIn status
+        // Validates: not already clocked in, has shift today
+    }
+
+    public function clockOut(Request $request): RedirectResponse|JsonResponse
+    {
+        // Updates TimeEntry with ClockedOut status
+        // Validates: is currently clocked in
+    }
+
+    public function startBreak(Request $request): RedirectResponse|JsonResponse
+    {
+        // Updates TimeEntry to OnBreak status
+        // Validates: is clocked in (not on break)
+    }
+
+    public function endBreak(Request $request): RedirectResponse|JsonResponse
+    {
+        // Updates TimeEntry back to ClockedIn status
+        // Calculates and records break duration
+    }
+}
+```
+
+**Dual Response Format:**
+All clock actions support both redirect (form) and JSON (API) responses based on request type.
+
+#### MySwapsController
+
+Handles employee-initiated shift swap requests.
+
+```php
+class MySwapsController extends Controller
+{
+    public function index(): View
+    {
+        // Outgoing: Requests I made
+        // Incoming: Requests targeting me (pending only)
+    }
+
+    public function create(Shift $shift): View
+    {
+        // Shows swap form for employee's own shift
+        // Lists available users with matching business role
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        // Creates ShiftSwapRequest
+        // Validates: shift belongs to user
+    }
+}
+```
+
+#### ProfileController
+
+Employee profile viewing and editing.
+
+```php
+class ProfileController extends Controller
+{
+    public function show(): View
+    {
+        // Displays user info with departments and roles
+    }
+
+    public function update(Request $request): RedirectResponse
+    {
+        // Updates name, email, phone
+        // Optional password change with current password verification
+    }
+}
+```
+
+### 11.4 Bottom Navigation Component
+
+```php
+// resources/views/components/bottom-nav.blade.php
+@props(['active' => 'home'])
+```
+
+**Navigation Items:**
+
+| Item | Route | Active State |
+|------|-------|--------------|
+| Home | dashboard | `active === 'home'` |
+| Shifts | my-shifts.index | `active === 'shifts'` |
+| Clock | time-clock.index | Always prominent (center) |
+| Swap | my-swaps.index | `active === 'swaps'` |
+| Profile | profile.show | `active === 'profile'` |
+
+**Clock Button:**
+The center clock button has a floating design with a larger hit area:
+- `-mt-8` negative margin to float above nav bar
+- Larger icon size (`w-7 h-7`)
+- Accent background (`bg-brand-600`)
+- Border matching page background (`border-gray-950`)
+
+### 11.5 Mobile View Files
+
+| View | Description |
+|------|-------------|
+| `my-shifts/index.blade.php` | Weekly shift calendar with day cards |
+| `time-clock/index.blade.php` | Clock in/out interface with live time |
+| `my-swaps/index.blade.php` | Incoming and outgoing swap requests |
+| `my-swaps/create.blade.php` | Create swap request form |
+| `profile/show.blade.php` | Profile view and edit form |
+| `my-leave/index.blade.php` | Leave requests and balances |
+
+### 11.6 Test Coverage
+
+| Test Class | Test Cases |
+|------------|------------|
+| MyShiftsControllerTest | View shifts, week navigation, draft visibility, tenant isolation |
+| EmployeeDashboardTest | Today's shift, week summary, leave balances, pending requests |
+| TimeClockControllerTest | Clock in/out, break management, validation, JSON responses |
+| MySwapsControllerTest | View swaps, create requests, authorization |
+| ProfileControllerTest | View profile, update info, change password, validation |
 
 ---
 
