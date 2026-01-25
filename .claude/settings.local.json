@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s /b \"C:\\\\websites\\\\plannrly\\\\*plannrly*\")",
+      "Bash(findstr:*)",
+      "Bash(ls:*)",
+      "mcp__laravel-boost__application-info",
+      "Bash(php artisan migrate:fresh:*)",
+      "Bash(php artisan test:*)",
+      "mcp__laravel-boost__last-error",
+      "mcp__laravel-boost__tinker",
+      "mcp__laravel-boost__database-schema",
+      "Bash(vendor/bin/pint:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "laravel-boost"
+  ]
+}
