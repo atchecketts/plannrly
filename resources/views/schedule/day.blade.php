@@ -38,7 +38,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <!-- Previous Day -->
-                        <a href="{{ route('schedule.day', ['date' => $selectedDate->copy()->subDay()->format('Y-m-d')]) }}"
+                        <a href="{{ route('schedule.day', ['date' => $selectedDate->copy()->subDay()->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                            class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -49,7 +49,7 @@
                             <p class="text-sm text-gray-500">{{ $selectedDate->isToday() ? 'Today' : $selectedDate->diffForHumans() }}</p>
                         </div>
                         <!-- Next Day -->
-                        <a href="{{ route('schedule.day', ['date' => $selectedDate->copy()->addDay()->format('Y-m-d')]) }}"
+                        <a href="{{ route('schedule.day', ['date' => $selectedDate->copy()->addDay()->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                            class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -57,7 +57,7 @@
                         </a>
                         <!-- Today Button -->
                         @if(!$selectedDate->isToday())
-                            <a href="{{ route('schedule.day') }}"
+                            <a href="{{ route('schedule.day', ['group_by' => $groupBy]) }}"
                                class="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
                                 Today
                             </a>
@@ -66,9 +66,9 @@
                     <div class="flex items-center gap-3">
                         <!-- View Toggle -->
                         <div class="flex bg-gray-800 rounded-lg p-1">
-                            <a href="{{ route('schedule.day', ['date' => $selectedDate->format('Y-m-d')]) }}"
+                            <a href="{{ route('schedule.day', ['date' => $selectedDate->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                                class="px-3 py-1.5 text-sm font-medium text-white bg-brand-900 rounded-md">Day</a>
-                            <a href="{{ route('schedule.index', ['start' => $selectedDate->copy()->startOfWeek()->format('Y-m-d')]) }}"
+                            <a href="{{ route('schedule.index', ['start' => $selectedDate->copy()->startOfWeek()->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                                class="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white rounded-md transition-colors">Week</a>
                         </div>
 
@@ -122,6 +122,20 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-500">Group By:</label>
+                        <select id="filter-group-by" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                            <option value="department">Department</option>
+                            <option value="role">Role</option>
+                        </select>
+                    </div>
+                    <!-- Make Default Button -->
+                    <button type="button" id="make-default-btn" class="flex items-center gap-1.5 text-sm text-gray-400 hover:text-brand-400 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                        Make Default
+                    </button>
                     <div class="flex items-center gap-2 ml-auto">
                         <input type="text" id="filter-search" placeholder="Search employees..." class="text-sm bg-gray-800 border-gray-700 text-white placeholder-gray-500 rounded-lg focus:ring-brand-500 focus:border-brand-500 w-48 px-3 py-1.5">
                     </div>
@@ -197,6 +211,8 @@
                         </div>
                     @endif
 
+                    @if($groupBy === 'department')
+                    {{-- Group by Department --}}
                     @forelse($departments as $department)
                         @php
                             $deptUsers = $usersByDepartment->get($department->id, collect());
@@ -205,12 +221,12 @@
 
                         @if($deptUsers->isNotEmpty())
                             <!-- Department Header -->
-                            <div class="department-header border-b px-4 py-2"
+                            <div class="group-header border-b px-4 py-2"
                                  data-department-id="{{ $department->id }}"
                                  data-location-id="{{ $department->location_id }}"
                                  style="background-color: {{ $deptColor }}20; border-color: {{ $deptColor }}40;">
                                 <span class="text-sm font-semibold" style="color: {{ $deptColor }};">{{ $department->name }}</span>
-                                <span class="dept-count text-xs ml-2" style="color: {{ $deptColor }}80;">{{ $deptUsers->count() }} {{ Str::plural('employee', $deptUsers->count()) }}</span>
+                                <span class="group-count text-xs ml-2" style="color: {{ $deptColor }}80;">{{ $deptUsers->count() }} {{ Str::plural('employee', $deptUsers->count()) }}</span>
                             </div>
 
                             @foreach($deptUsers as $user)
@@ -308,6 +324,123 @@
                             No departments found. Create departments and assign employees to see the schedule grid.
                         </div>
                     @endforelse
+
+                    @else
+                    {{-- Group by Role --}}
+                    @forelse($businessRoles as $role)
+                        @php
+                            $roleUsers = $usersByRole->get($role->id, collect());
+                            $roleColor = $role->color ?? '#6366f1';
+                        @endphp
+
+                        @if($roleUsers->isNotEmpty())
+                            <!-- Role Header -->
+                            <div class="group-header border-b px-4 py-2"
+                                 data-role-id="{{ $role->id }}"
+                                 data-department-id="{{ $role->department_id }}"
+                                 data-location-id="{{ $role->department?->location_id }}"
+                                 style="background-color: {{ $roleColor }}20; border-color: {{ $roleColor }}40;">
+                                <span class="text-sm font-semibold" style="color: {{ $roleColor }};">{{ $role->name }}</span>
+                                <span class="text-xs ml-2" style="color: {{ $roleColor }}60;">{{ $role->department?->name }}</span>
+                                <span class="group-count text-xs ml-2" style="color: {{ $roleColor }}80;">{{ $roleUsers->count() }} {{ Str::plural('employee', $roleUsers->count()) }}</span>
+                            </div>
+
+                            @foreach($roleUsers as $user)
+                                @php
+                                    $userColor = $role->color ?? $defaultColors[$colorIndex % count($defaultColors)];
+                                    $colorIndex++;
+                                    $userRoleIds = $user->businessRoles->pluck('id')->implode(',');
+                                    $userDepartment = $role->department;
+                                    $userShifts = $shiftsLookup[$user->id] ?? [];
+                                    $leave = $leaveLookup[$user->id] ?? null;
+                                @endphp
+
+                                <!-- Employee Row -->
+                                <div class="employee-row grid bg-gray-900 border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                                     data-user-id="{{ $user->id }}"
+                                     data-department-id="{{ $userDepartment?->id }}"
+                                     data-location-id="{{ $userDepartment?->location_id }}"
+                                     data-role-ids="{{ $userRoleIds }}"
+                                     data-name="{{ strtolower($user->full_name) }}"
+                                     style="grid-template-columns: 200px 1fr;">
+                                    <!-- Employee Info -->
+                                    <div class="p-3 border-r border-gray-800 flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-xs" style="background-color: {{ $userColor }}30; color: {{ $userColor }};">
+                                            {{ $user->initials }}
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-white employee-name">{{ $user->full_name }}</div>
+                                            <div class="text-xs text-gray-500">{{ $userDailyHours[$user->id] ?? 0 }} hrs today</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Timeline Area -->
+                                    <div class="relative h-16 schedule-cell cursor-pointer hover:bg-gray-800/30 transition-colors"
+                                         data-user-id="{{ $user->id }}"
+                                         data-date="{{ $selectedDate->format('Y-m-d') }}"
+                                         data-location-id="{{ $userDepartment?->location_id }}"
+                                         data-department-id="{{ $userDepartment?->id }}"
+                                         @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
+
+                                        <!-- Hour grid lines -->
+                                        <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: repeat({{ $numHours }}, 1fr);">
+                                            @foreach($hours as $hour)
+                                                <div class="hour-column"></div>
+                                            @endforeach
+                                        </div>
+
+                                        @if($leave)
+                                            <!-- Leave Block -->
+                                            <div class="absolute inset-2 bg-amber-500/20 border border-amber-500/50 rounded-lg flex items-center justify-center">
+                                                <span class="font-medium text-amber-400 text-sm">{{ $leave->leaveType->name ?? 'Leave' }}</span>
+                                            </div>
+                                        @else
+                                            @foreach($userShifts as $shift)
+                                                @php
+                                                    $startHour = $shift->start_time->hour + ($shift->start_time->minute / 60);
+                                                    $endHour = $shift->end_time->hour + ($shift->end_time->minute / 60);
+                                                    if ($endHour < $startHour) $endHour += 24; // Overnight
+                                                    $leftPercent = (($startHour - $dayStartHour) / $numHours) * 100;
+                                                    $widthPercent = (($endHour - $startHour) / $numHours) * 100;
+                                                    $leftPercent = max(0, min(100, $leftPercent));
+                                                    $widthPercent = max(0, min(100 - $leftPercent, $widthPercent));
+                                                @endphp
+                                                <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white cursor-pointer hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                     style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; background-color: {{ $shift->businessRole?->color ?? $userColor }};"
+                                                     data-shift-id="{{ $shift->id }}"
+                                                     @click.stop="editModal.open({{ $shift->id }})">
+                                                    <div class="flex items-center justify-between h-full">
+                                                        <div class="truncate">
+                                                            @if($shift->isDraft())
+                                                                <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mr-1">Draft</span>
+                                                            @endif
+                                                            <span class="font-medium">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                        </div>
+                                                        <span class="text-white/60 ml-2">{{ $shift->duration_hours }} hrs</span>
+                                                    </div>
+                                                    <div class="truncate text-white/80 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</div>
+                                                </div>
+                                            @endforeach
+
+                                            @if(count($userShifts) === 0)
+                                                <!-- Empty state - show add button on hover -->
+                                                <div class="add-shift-btn absolute inset-2 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-500/10 transition-colors">
+                                                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                    </svg>
+                                                </div>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
+                    @empty
+                        <div class="p-8 text-center text-gray-500">
+                            No roles found. Create business roles and assign employees to see the schedule grid.
+                        </div>
+                    @endforelse
+                    @endif
 
                     @if($usersByDepartment->has(0) && $usersByDepartment->get(0)->isNotEmpty())
                         <!-- Unassigned Employees -->
@@ -810,7 +943,9 @@
                     const locationFilter = document.getElementById('filter-location');
                     const departmentFilter = document.getElementById('filter-department');
                     const roleFilter = document.getElementById('filter-role');
+                    const groupByFilter = document.getElementById('filter-group-by');
                     const searchFilter = document.getElementById('filter-search');
+                    const makeDefaultBtn = document.getElementById('make-default-btn');
 
                     const allDepartmentOptions = Array.from(departmentFilter.querySelectorAll('option'));
                     const allRoleOptions = Array.from(roleFilter.querySelectorAll('option'));
@@ -822,9 +957,10 @@
                         const searchTerm = searchFilter.value.toLowerCase().trim();
 
                         const employeeRows = document.querySelectorAll('.employee-row');
-                        const departmentHeaders = document.querySelectorAll('.department-header');
+                        const groupHeaders = document.querySelectorAll('.group-header');
 
                         const visibleByDept = {};
+                        const visibleByRole = {};
 
                         employeeRows.forEach(row => {
                             const rowLocationId = row.dataset.locationId;
@@ -852,18 +988,32 @@
 
                             row.style.display = visible ? '' : 'none';
 
+                            // Track visibility by department
                             if (!visibleByDept[rowDepartmentId]) {
                                 visibleByDept[rowDepartmentId] = 0;
                             }
                             if (visible) {
                                 visibleByDept[rowDepartmentId]++;
                             }
+
+                            // Track visibility by role (for role grouping)
+                            rowRoleIds.forEach(roleId => {
+                                if (!visibleByRole[roleId]) {
+                                    visibleByRole[roleId] = 0;
+                                }
+                                if (visible) {
+                                    visibleByRole[roleId]++;
+                                }
+                            });
                         });
 
-                        departmentHeaders.forEach(header => {
+                        groupHeaders.forEach(header => {
                             const deptId = header.dataset.departmentId;
+                            const roleId = header.dataset.roleId;
                             const locationId = header.dataset.locationId;
-                            const visibleCount = visibleByDept[deptId] || 0;
+
+                            // Use role count if this is a role header, otherwise use dept count
+                            const visibleCount = roleId ? (visibleByRole[roleId] || 0) : (visibleByDept[deptId] || 0);
 
                             let showHeader = visibleCount > 0;
 
@@ -871,9 +1021,19 @@
                                 showHeader = false;
                             }
 
+                            // For role headers, also check department filter
+                            if (roleId && selectedDepartmentId && deptId !== selectedDepartmentId) {
+                                showHeader = false;
+                            }
+
+                            // For role headers, also check role filter
+                            if (roleId && selectedRoleId && roleId !== selectedRoleId) {
+                                showHeader = false;
+                            }
+
                             header.style.display = showHeader ? '' : 'none';
 
-                            const countSpan = header.querySelector('.dept-count');
+                            const countSpan = header.querySelector('.group-count');
                             if (countSpan && showHeader) {
                                 const word = visibleCount === 1 ? 'employee' : 'employees';
                                 countSpan.textContent = `${visibleCount} ${word}`;
@@ -987,7 +1147,143 @@
                     });
 
                     roleFilter.addEventListener('change', filterEmployees);
-                    searchFilter.addEventListener('input', filterEmployees);
+
+                    let searchTimeout;
+                    searchFilter.addEventListener('input', function() {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(filterEmployees, 200);
+                    });
+
+                    // Make Default button click handler
+                    makeDefaultBtn.addEventListener('click', async function() {
+                        const btn = this;
+                        const originalText = btn.innerHTML;
+
+                        btn.innerHTML = `
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                        `;
+                        btn.disabled = true;
+
+                        try {
+                            const response = await fetch('{{ route("user.filter-defaults.store") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    filter_context: 'schedule_day',
+                                    location_id: locationFilter.value || null,
+                                    department_id: departmentFilter.value || null,
+                                    business_role_id: roleFilter.value || null,
+                                    group_by: groupByFilter.value || 'department',
+                                }),
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                btn.innerHTML = `
+                                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Saved!
+                                `;
+                                setTimeout(() => {
+                                    btn.innerHTML = originalText;
+                                    btn.disabled = false;
+                                }, 2000);
+                            } else {
+                                throw new Error(data.message || 'Failed to save');
+                            }
+                        } catch (error) {
+                            btn.innerHTML = `
+                                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Failed
+                            `;
+                            setTimeout(() => {
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                            }, 2000);
+                        }
+                    });
+
+                    // Load saved defaults
+                    (async () => {
+                        try {
+                            const response = await fetch('{{ route("user.filter-defaults.show") }}?filter_context=schedule_day', {
+                                headers: {
+                                    'Accept': 'application/json',
+                                },
+                            });
+
+                            const data = await response.json();
+
+                            if (data.location_id) {
+                                locationFilter.value = data.location_id;
+                                departmentFilter.disabled = false;
+                                departmentFilter.innerHTML = '<option value="">Select Department</option>';
+                                allDepartmentOptions.forEach(option => {
+                                    if (option.value === '') return;
+                                    if (option.dataset.locationId === String(data.location_id)) {
+                                        departmentFilter.appendChild(option.cloneNode(true));
+                                    }
+                                });
+
+                                if (data.department_id) {
+                                    departmentFilter.value = data.department_id;
+                                    roleFilter.disabled = false;
+                                    roleFilter.innerHTML = '<option value="">Select Role</option>';
+                                    allRoleOptions.forEach(option => {
+                                        if (option.value === '') return;
+                                        if (option.dataset.departmentId === String(data.department_id)) {
+                                            roleFilter.appendChild(option.cloneNode(true));
+                                        }
+                                    });
+
+                                    if (data.business_role_id) {
+                                        roleFilter.value = data.business_role_id;
+                                    }
+                                } else {
+                                    roleFilter.innerHTML = '<option value="">Select Department First</option>';
+                                }
+
+                                filterEmployees();
+                            }
+
+                            // Set group_by from saved defaults (unless already set from URL)
+                            const urlParams = new URLSearchParams(window.location.search);
+                            if (!urlParams.has('group_by') && data.group_by) {
+                                groupByFilter.value = data.group_by;
+                                // If the saved group_by is different from current, reload with it
+                                const currentGroupBy = '{{ request()->query("group_by", "department") }}';
+                                if (data.group_by !== currentGroupBy) {
+                                    urlParams.set('group_by', data.group_by);
+                                    window.location.search = urlParams.toString();
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Failed to load filter defaults:', error);
+                        }
+                    })();
+
+                    // Set initial group_by value from URL
+                    const currentGroupBy = '{{ request()->query("group_by", "department") }}';
+                    groupByFilter.value = currentGroupBy;
+
+                    // Handle group_by change - reload page with new setting
+                    groupByFilter.addEventListener('change', function() {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        urlParams.set('group_by', this.value);
+                        window.location.search = urlParams.toString();
+                    });
                 }
             };
         }

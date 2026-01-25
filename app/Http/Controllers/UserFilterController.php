@@ -15,9 +15,15 @@ class UserFilterController extends Controller
             'location_id' => ['nullable', 'integer', 'exists:locations,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'business_role_id' => ['nullable', 'integer', 'exists:business_roles,id'],
+            'group_by' => ['nullable', 'string', 'in:department,role'],
         ]);
 
         $user = auth()->user();
+
+        $additionalFilters = [];
+        if (isset($validated['group_by'])) {
+            $additionalFilters['group_by'] = $validated['group_by'];
+        }
 
         UserFilterDefault::updateOrCreate(
             [
@@ -25,9 +31,10 @@ class UserFilterController extends Controller
                 'filter_context' => $validated['filter_context'],
             ],
             [
-                'location_id' => $validated['location_id'] ?: null,
-                'department_id' => $validated['department_id'] ?: null,
-                'business_role_id' => $validated['business_role_id'] ?: null,
+                'location_id' => $validated['location_id'] ?? null,
+                'department_id' => $validated['department_id'] ?? null,
+                'business_role_id' => $validated['business_role_id'] ?? null,
+                'additional_filters' => $additionalFilters ?: null,
             ]
         );
 
@@ -47,6 +54,7 @@ class UserFilterController extends Controller
                 'location_id' => null,
                 'department_id' => null,
                 'business_role_id' => null,
+                'group_by' => 'department',
             ]);
         }
 
@@ -54,6 +62,7 @@ class UserFilterController extends Controller
             'location_id' => $defaults->location_id,
             'department_id' => $defaults->department_id,
             'business_role_id' => $defaults->business_role_id,
+            'group_by' => $defaults->getFilter('group_by', 'department'),
         ]);
     }
 }

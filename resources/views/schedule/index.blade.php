@@ -37,7 +37,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <!-- Previous Week -->
-                        <a href="{{ route('schedule.index', ['start' => $startDate->copy()->subWeek()->format('Y-m-d')]) }}" class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+                        <a href="{{ route('schedule.index', ['start' => $startDate->copy()->subWeek()->format('Y-m-d'), 'group_by' => $groupBy]) }}" class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                             </svg>
@@ -47,14 +47,14 @@
                             <p class="text-sm text-gray-500">Week {{ $startDate->weekOfYear }}</p>
                         </div>
                         <!-- Next Week -->
-                        <a href="{{ route('schedule.index', ['start' => $startDate->copy()->addWeek()->format('Y-m-d')]) }}" class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+                        <a href="{{ route('schedule.index', ['start' => $startDate->copy()->addWeek()->format('Y-m-d'), 'group_by' => $groupBy]) }}" class="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                             </svg>
                         </a>
                         <!-- Today Button -->
                         @if(!$startDate->isCurrentWeek())
-                            <a href="{{ route('schedule.index') }}" class="ml-2 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors">
+                            <a href="{{ route('schedule.index', ['group_by' => $groupBy]) }}" class="ml-2 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors">
                                 Today
                             </a>
                         @endif
@@ -62,9 +62,9 @@
                     <div class="flex items-center gap-3">
                         <!-- View Toggle -->
                         <div class="flex bg-gray-800 rounded-lg p-1">
-                            <a href="{{ route('schedule.day', ['date' => $startDate->format('Y-m-d')]) }}"
+                            <a href="{{ route('schedule.day', ['date' => $startDate->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                                class="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white rounded-md transition-colors">Day</a>
-                            <a href="{{ route('schedule.index', ['start' => $startDate->format('Y-m-d')]) }}"
+                            <a href="{{ route('schedule.index', ['start' => $startDate->format('Y-m-d'), 'group_by' => $groupBy]) }}"
                                class="px-3 py-1.5 text-sm font-medium text-white bg-brand-900 rounded-md">Week</a>
                         </div>
 
@@ -116,6 +116,13 @@
                             @foreach($businessRoles as $role)
                                 <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
                             @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-500">Group By:</label>
+                        <select id="filter-group-by" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                            <option value="department">Department</option>
+                            <option value="role">Role</option>
                         </select>
                     </div>
                     <!-- Make Default Button -->
@@ -230,6 +237,8 @@
                         @endforeach
                     </div>
 
+                    @if($groupBy === 'department')
+                    {{-- Group by Department --}}
                     @forelse($departments as $department)
                         @php
                             $deptUsers = $usersByDepartment->get($department->id, collect());
@@ -238,12 +247,12 @@
 
                         @if($deptUsers->isNotEmpty())
                             <!-- Department Header -->
-                            <div class="department-header border-b px-4 py-2"
+                            <div class="department-header group-header border-b px-4 py-2"
                                  data-department-id="{{ $department->id }}"
                                  data-location-id="{{ $department->location_id }}"
                                  style="background-color: {{ $deptColor }}20; border-color: {{ $deptColor }}40;">
                                 <span class="text-sm font-semibold" style="color: {{ $deptColor }};">{{ $department->name }}</span>
-                                <span class="dept-count text-xs ml-2" style="color: {{ $deptColor }}80;">{{ $deptUsers->count() }} {{ Str::plural('employee', $deptUsers->count()) }}</span>
+                                <span class="group-count text-xs ml-2" style="color: {{ $deptColor }}80;">{{ $deptUsers->count() }} {{ Str::plural('employee', $deptUsers->count()) }}</span>
                             </div>
 
                             @foreach($deptUsers as $user)
@@ -352,6 +361,134 @@
                             No departments found. Create departments and assign employees to see the schedule grid.
                         </div>
                     @endforelse
+
+                    @else
+                    {{-- Group by Role --}}
+                    @forelse($businessRoles as $role)
+                        @php
+                            $roleUsers = $usersByRole->get($role->id, collect());
+                            $roleColor = $role->color ?? '#6366f1';
+                        @endphp
+
+                        @if($roleUsers->isNotEmpty())
+                            <!-- Role Header -->
+                            <div class="group-header border-b px-4 py-2"
+                                 data-role-id="{{ $role->id }}"
+                                 data-department-id="{{ $role->department_id }}"
+                                 data-location-id="{{ $role->department?->location_id }}"
+                                 style="background-color: {{ $roleColor }}20; border-color: {{ $roleColor }}40;">
+                                <span class="text-sm font-semibold" style="color: {{ $roleColor }};">{{ $role->name }}</span>
+                                <span class="text-xs ml-2" style="color: {{ $roleColor }}60;">{{ $role->department?->name }}</span>
+                                <span class="group-count text-xs ml-2" style="color: {{ $roleColor }}80;">{{ $roleUsers->count() }} {{ Str::plural('employee', $roleUsers->count()) }}</span>
+                            </div>
+
+                            @foreach($roleUsers as $user)
+                                @php
+                                    $userColor = $role->color ?? $defaultColors[$colorIndex % count($defaultColors)];
+                                    $colorIndex++;
+                                    $userRoleIds = $user->businessRoles->pluck('id')->implode(',');
+                                    $userDepartment = $role->department;
+                                @endphp
+
+                                <!-- Employee Row -->
+                                <div class="employee-row grid bg-gray-900 border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                                     data-user-id="{{ $user->id }}"
+                                     data-department-id="{{ $userDepartment?->id }}"
+                                     data-location-id="{{ $userDepartment?->location_id }}"
+                                     data-role-ids="{{ $userRoleIds }}"
+                                     data-name="{{ strtolower($user->full_name) }}"
+                                     style="grid-template-columns: 200px repeat({{ $numDays }}, minmax(100px, 1fr));">
+                                    <!-- Employee Info -->
+                                    <div class="p-3 border-r border-gray-800 flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-xs" style="background-color: {{ $userColor }}30; color: {{ $userColor }};">
+                                            {{ $user->initials }}
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-white employee-name">{{ $user->full_name }}</div>
+                                            <div class="text-xs text-gray-500">{{ $userWeeklyHours[$user->id] ?? 0 }} hrs this week</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Day Cells -->
+                                    @foreach($weekDates as $date)
+                                        @php
+                                            $dateStr = $date->format('Y-m-d');
+                                            $userShifts = $shiftsLookup[$user->id][$dateStr] ?? [];
+                                            $leave = $leaveLookup[$user->id][$dateStr] ?? null;
+                                            $isWeekend = $date->isWeekend();
+                                            $isToday = $date->isToday();
+                                        @endphp
+
+                                        <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell cursor-pointer hover:bg-gray-800 transition-colors"
+                                             data-user-id="{{ $user->id }}"
+                                             data-date="{{ $dateStr }}"
+                                             data-location-id="{{ $userDepartment?->location_id }}"
+                                             data-department-id="{{ $userDepartment?->id }}"
+                                             @dragover.prevent
+                                             @dragenter="handleDragEnter($event)"
+                                             @dragleave="handleDragLeave($event)"
+                                             @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')"
+                                             title="Click to add shift">
+
+                                            @if($leave)
+                                                <!-- Leave Block -->
+                                                <div class="bg-amber-500/20 border border-amber-500/50 rounded-lg p-2 text-xs">
+                                                    <div class="font-medium text-amber-400">{{ $leave->leaveType->name ?? 'Leave' }}</div>
+                                                </div>
+                                            @elseif(count($userShifts) > 0)
+                                                <div class="space-y-1">
+                                                    @foreach($userShifts as $shift)
+                                                        <!-- Shift Block -->
+                                                        <div class="shift-block text-white rounded-lg p-2 text-xs cursor-move transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                             style="background-color: {{ $shift->businessRole?->color ?? $userColor }};"
+                                                             data-shift-id="{{ $shift->id }}"
+                                                             data-user-id="{{ $user->id }}"
+                                                             data-date="{{ $dateStr }}"
+                                                             data-status="{{ $shift->status->value }}"
+                                                             data-start-time="{{ $shift->start_time->format('H:i') }}"
+                                                             data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                             draggable="true"
+                                                             @dragstart="handleDragStart($event, {{ $shift->id }})"
+                                                             @dragend="handleDragEnd($event)"
+                                                             @click.stop="editModal.open({{ $shift->id }})">
+                                                            @if($shift->isDraft())
+                                                                <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
+                                                            @endif
+                                                            <div class="shift-times font-medium flex items-center justify-between">
+                                                                <span>{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                                <span class="text-white/60">{{ $shift->duration_hours }} hrs</span>
+                                                            </div>
+                                                            <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
+                                                        </div>
+                                                    @endforeach
+                                                    <!-- Add Another Shift Button -->
+                                                    <div class="add-shift-btn h-6 border border-dashed border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
+                                                         @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
+                                                        <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <!-- Empty Cell - Add Shift Placeholder -->
+                                                <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
+                                                     @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
+                                                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                    </svg>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        @endif
+                    @empty
+                        <div class="p-8 text-center text-gray-500">
+                            No roles found. Create business roles and assign employees to see the schedule grid.
+                        </div>
+                    @endforelse
+                    @endif
 
                     @if($usersByDepartment->has(0) && $usersByDepartment->get(0)->isNotEmpty())
                         <!-- Unassigned Employees -->
@@ -1457,12 +1594,8 @@
                         return;
                     }
 
-                    // For assigned rows, check if target cell already has a shift
-                    // For unassigned row, allow multiple shifts per cell
+                    // Check if target is unassigned row
                     const isTargetUnassigned = normalizedTargetUserId === null;
-                    if (!isTargetUnassigned && cell.querySelector('.shift-block')) {
-                        return;
-                    }
 
                     try {
                         const response = await fetch(`/shifts/${shiftId}`, {
@@ -1475,8 +1608,8 @@
                             body: JSON.stringify({
                                 user_id: normalizedTargetUserId,
                                 date: date,
-                                start_time: originalElement.querySelector('.shift-times').textContent.split(' - ')[0],
-                                end_time: originalElement.querySelector('.shift-times').textContent.split(' - ')[1],
+                                start_time: originalElement.dataset.startTime,
+                                end_time: originalElement.dataset.endTime,
                             })
                         });
 
@@ -1497,14 +1630,6 @@
                         // Move the element in the DOM
                         const isOriginalUnassigned = normalizedOriginalUserId === null;
 
-                        // Remove placeholder from target cell (if it's the only element)
-                        if (!isTargetUnassigned) {
-                            const targetPlaceholder = cell.querySelector('.add-shift-btn');
-                            if (targetPlaceholder) {
-                                targetPlaceholder.remove();
-                            }
-                        }
-
                         // Update the element's data attributes
                         originalElement.dataset.userId = normalizedTargetUserId ?? '';
                         originalElement.dataset.date = date;
@@ -1516,22 +1641,25 @@
                             originalElement.classList.remove('border', 'border-amber-500/30');
                         }
 
-                        // For unassigned row, append to the space-y-1 container or create one
-                        if (isTargetUnassigned) {
-                            let shiftContainer = cell.querySelector('.space-y-1');
-                            if (!shiftContainer) {
-                                // Remove placeholder if present
-                                const placeholder = cell.querySelector('.add-shift-btn');
-                                if (placeholder) {
-                                    placeholder.remove();
-                                }
-                                shiftContainer = document.createElement('div');
-                                shiftContainer.className = 'space-y-1';
-                                cell.appendChild(shiftContainer);
+                        // Append to the space-y-1 container or create one
+                        let shiftContainer = cell.querySelector('.space-y-1');
+                        if (!shiftContainer) {
+                            // Remove placeholder if present
+                            const placeholder = cell.querySelector('.add-shift-btn');
+                            if (placeholder) {
+                                placeholder.remove();
                             }
-                            shiftContainer.appendChild(originalElement);
+                            shiftContainer = document.createElement('div');
+                            shiftContainer.className = 'space-y-1';
+                            cell.appendChild(shiftContainer);
+                        }
+
+                        // Insert shift before the "add shift" button if it exists
+                        const addBtn = shiftContainer.querySelector('.add-shift-btn');
+                        if (addBtn) {
+                            shiftContainer.insertBefore(originalElement, addBtn);
                         } else {
-                            cell.appendChild(originalElement);
+                            shiftContainer.appendChild(originalElement);
                         }
 
                         // Handle original cell - add placeholder if no shifts remain
@@ -1540,14 +1668,17 @@
                         const dropOrigLocationId = originalCell.dataset.locationId;
                         const dropOrigDepartmentId = originalCell.dataset.departmentId;
 
-                        if (isOriginalUnassigned) {
-                            const remainingShifts = originalCell.querySelectorAll('.shift-block');
-                            if (remainingShifts.length === 0) {
-                                const container = originalCell.querySelector('.space-y-1');
-                                if (container) {
-                                    container.remove();
-                                }
-                                const placeholder = document.createElement('div');
+                        // Check if there are remaining shifts in the original cell
+                        const remainingShifts = originalCell.querySelectorAll('.shift-block');
+                        if (remainingShifts.length === 0) {
+                            // No shifts remain - remove container and add placeholder
+                            const container = originalCell.querySelector('.space-y-1');
+                            if (container) {
+                                container.remove();
+                            }
+
+                            const placeholder = document.createElement('div');
+                            if (isOriginalUnassigned) {
                                 placeholder.className = 'add-shift-btn h-full min-h-[44px] border-2 border-dashed border-amber-700/50 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 hover:bg-amber-500/10 transition-colors';
                                 placeholder.innerHTML = `
                                     <svg class="w-5 h-5 text-amber-600/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1558,20 +1689,18 @@
                                     e.stopPropagation();
                                     window.Alpine.evaluate(document.querySelector('[x-data]'), `editModal.create(null, '${dropOrigDateStr}', ${dropOrigLocationId}, ${dropOrigDepartmentId})`);
                                 });
-                                originalCell.appendChild(placeholder);
+                            } else {
+                                placeholder.className = 'add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors';
+                                placeholder.innerHTML = `
+                                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                `;
+                                placeholder.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    window.Alpine.evaluate(document.querySelector('[x-data]'), `editModal.create(${dropOrigUserId}, '${dropOrigDateStr}', ${dropOrigLocationId}, ${dropOrigDepartmentId})`);
+                                });
                             }
-                        } else {
-                            const placeholder = document.createElement('div');
-                            placeholder.className = 'add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors';
-                            placeholder.innerHTML = `
-                                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                            `;
-                            placeholder.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                window.Alpine.evaluate(document.querySelector('[x-data]'), `editModal.create(${dropOrigUserId}, '${dropOrigDateStr}', ${dropOrigLocationId}, ${dropOrigDepartmentId})`);
-                            });
                             originalCell.appendChild(placeholder);
                         }
 
@@ -1600,6 +1729,7 @@
                     const locationFilter = document.getElementById('filter-location');
                     const departmentFilter = document.getElementById('filter-department');
                     const roleFilter = document.getElementById('filter-role');
+                    const groupByFilter = document.getElementById('filter-group-by');
                     const searchFilter = document.getElementById('filter-search');
                     const makeDefaultBtn = document.getElementById('make-default-btn');
 
@@ -1613,9 +1743,10 @@
                         const searchTerm = searchFilter.value.toLowerCase().trim();
 
                         const employeeRows = document.querySelectorAll('.employee-row');
-                        const departmentHeaders = document.querySelectorAll('.department-header');
+                        const groupHeaders = document.querySelectorAll('.group-header');
 
                         const visibleByDept = {};
+                        const visibleByRole = {};
 
                         employeeRows.forEach(row => {
                             const rowLocationId = row.dataset.locationId;
@@ -1643,18 +1774,32 @@
 
                             row.style.display = visible ? '' : 'none';
 
+                            // Track visibility by department
                             if (!visibleByDept[rowDepartmentId]) {
                                 visibleByDept[rowDepartmentId] = 0;
                             }
                             if (visible) {
                                 visibleByDept[rowDepartmentId]++;
                             }
+
+                            // Track visibility by role (for role grouping)
+                            rowRoleIds.forEach(roleId => {
+                                if (!visibleByRole[roleId]) {
+                                    visibleByRole[roleId] = 0;
+                                }
+                                if (visible) {
+                                    visibleByRole[roleId]++;
+                                }
+                            });
                         });
 
-                        departmentHeaders.forEach(header => {
+                        groupHeaders.forEach(header => {
                             const deptId = header.dataset.departmentId;
+                            const roleId = header.dataset.roleId;
                             const locationId = header.dataset.locationId;
-                            const visibleCount = visibleByDept[deptId] || 0;
+
+                            // Use role count if this is a role header, otherwise use dept count
+                            const visibleCount = roleId ? (visibleByRole[roleId] || 0) : (visibleByDept[deptId] || 0);
 
                             let showHeader = visibleCount > 0;
 
@@ -1662,9 +1807,19 @@
                                 showHeader = false;
                             }
 
+                            // For role headers, also check department filter
+                            if (roleId && selectedDepartmentId && deptId !== selectedDepartmentId) {
+                                showHeader = false;
+                            }
+
+                            // For role headers, also check role filter
+                            if (roleId && selectedRoleId && roleId !== selectedRoleId) {
+                                showHeader = false;
+                            }
+
                             header.style.display = showHeader ? '' : 'none';
 
-                            const countSpan = header.querySelector('.dept-count');
+                            const countSpan = header.querySelector('.group-count');
                             if (countSpan && showHeader) {
                                 const word = visibleCount === 1 ? 'employee' : 'employees';
                                 countSpan.textContent = `${visibleCount} ${word}`;
@@ -1812,6 +1967,7 @@
                                     location_id: locationFilter.value || null,
                                     department_id: departmentFilter.value || null,
                                     business_role_id: roleFilter.value || null,
+                                    group_by: groupByFilter.value || 'department',
                                 }),
                             });
 
@@ -1887,10 +2043,33 @@
 
                                 filterEmployees();
                             }
+
+                            // Set group_by from saved defaults (unless already set from URL)
+                            const urlParams = new URLSearchParams(window.location.search);
+                            if (!urlParams.has('group_by') && data.group_by) {
+                                groupByFilter.value = data.group_by;
+                                // If the saved group_by is different from current, reload with it
+                                const currentGroupBy = '{{ request()->query("group_by", "department") }}';
+                                if (data.group_by !== currentGroupBy) {
+                                    urlParams.set('group_by', data.group_by);
+                                    window.location.search = urlParams.toString();
+                                }
+                            }
                         } catch (error) {
                             console.error('Failed to load filter defaults:', error);
                         }
                     })();
+
+                    // Set initial group_by value from URL
+                    const currentGroupBy = '{{ request()->query("group_by", "department") }}';
+                    groupByFilter.value = currentGroupBy;
+
+                    // Handle group_by change - reload page with new setting
+                    groupByFilter.addEventListener('change', function() {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        urlParams.set('group_by', this.value);
+                        window.location.search = urlParams.toString();
+                    });
                 }
             };
         }

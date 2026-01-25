@@ -550,7 +550,8 @@ The week view displays shifts for a week at a time with navigation controls and 
 ┌─────────────────────────────────────────────────────────────┐
 │  [Day|Week]   ◄ Prev   Week of Jan 15-21, 2024   Next ►    │
 ├─────────────────────────────────────────────────────────────┤
-│ Filters: [Location ▼] [Department ▼] [Role ▼] [Make Default]│
+│ Filters: [Location ▼] [Department ▼] [Role ▼] [Group By ▼] │
+│          [🔖 Make Default]                          [Search]│
 ├─────────────────────────────────────────────────────────────┤
 │         │ Mon 15 │ Tue 16 │ Wed 17 │ Thu 18 │ Fri 19 │ ... │
 ├─────────┼────────┼────────┼────────┼────────┼────────┼─────┤
@@ -575,7 +576,8 @@ The day view provides a timeline visualization for a single day with hours as co
 ┌─────────────────────────────────────────────────────────────┐
 │  [Day|Week]   ◄ Prev   Wednesday, Jan 15, 2024   Next ►    │
 ├─────────────────────────────────────────────────────────────┤
-│ Filters: [Location ▼] [Department ▼] [Role ▼] [Make Default]│
+│ Filters: [Location ▼] [Department ▼] [Role ▼] [Group By ▼] │
+│          [🔖 Make Default]                          [Search]│
 ├─────────────────────────────────────────────────────────────┤
 │         │ 6 │ 7 │ 8 │ 9 │10 │11 │12 │13 │14 │15 │16 │17 │.│
 ├─────────┼───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴──┤
@@ -614,10 +616,20 @@ The day view provides a timeline visualization for a single day with hours as co
 - Selecting a department filters the role dropdown to show only roles in that department
 - Filters also filter the employee list to show only matching employees
 
-**Filter Defaults:**
+**Group By:**
+- Toggle between "Group By Department" and "Group By Role" views
+- Department grouping shows employees organized under their primary department headers
+- Role grouping shows employees organized under their primary business role headers
+- Changing the group by selection reloads the page with the new grouping mode
+- Group by preference is preserved when navigating between dates and views
+- URL parameter: `?group_by=department` or `?group_by=role`
+
+**Filter Defaults (Bookmark):**
 - "Make Default" button saves the current filter selection as user preferences
-- Defaults are stored per-user and per-context (schedule, users, etc.)
+- Defaults are stored per-user and per-context (schedule for week view, schedule_day for day view)
+- Saves location, department, role, and group_by preferences
 - On page load, user's saved defaults are automatically applied if available
+- If saved group_by differs from URL, page reloads with saved preference
 
 **Shift Interactions:**
 
@@ -658,8 +670,14 @@ The day view provides a timeline visualization for a single day with hours as co
 - Drag shifts between days to reschedule
 - Visual feedback: dragged shift becomes semi-transparent, target cell shows purple dashed outline
 - Drop updates the shift's `user_id` and/or `date` via API
-- Cannot drop on cells that already contain a shift (except unassigned row)
 - DOM updates immediately without page reload
+- Multiple shifts per employee per day supported (split shifts)
+
+*Shift Overlap Validation:*
+- Server-side validation prevents overlapping shifts for the same employee
+- When creating or updating a shift, the system checks for time conflicts
+- Handles overnight shifts correctly (end time before start time = crosses midnight)
+- Validation error displayed: "This shift overlaps with another shift for this employee."
 
 *Unassigned Shifts Row:*
 - The first row in the schedule displays shifts that have no employee assigned (`user_id = NULL`)

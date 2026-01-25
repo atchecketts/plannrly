@@ -795,7 +795,7 @@ class LeaveRequest extends Model
 }
 ```
 
-### 2.8 UserFilterDefault Model
+### 2.9 UserFilterDefault Model
 
 ```php
 class UserFilterDefault extends Model
@@ -813,6 +813,19 @@ class UserFilterDefault extends Model
     public function location(): BelongsTo
     public function department(): BelongsTo
     public function businessRole(): BelongsTo
+
+    // Helper method for retrieving values from additional_filters
+    public function getFilter(string $key, $default = null): mixed
+    {
+        return $this->additional_filters[$key] ?? $default;
+    }
+}
+```
+
+**Additional Filters JSON Structure:**
+```json
+{
+  "group_by": "department"  // or "role"
 }
 ```
 
@@ -1393,10 +1406,16 @@ Location::query()
 |--------|-----|------------|-------------|
 | GET | /schedule | ScheduleController@index | View weekly schedule (default: current week) |
 | GET | /schedule?start=YYYY-MM-DD | ScheduleController@index | View schedule for specific week |
+| GET | /schedule?group_by=role | ScheduleController@index | View schedule grouped by role |
 | GET | /schedule/day | ScheduleController@day | View daily schedule (default: today) |
 | GET | /schedule/day?date=YYYY-MM-DD | ScheduleController@day | View schedule for specific day |
+| GET | /schedule/day?group_by=role | ScheduleController@day | View day schedule grouped by role |
 | GET | /schedule/draft-count | ScheduleController@draftCount | Get count of draft shifts (JSON) |
 | POST | /schedule/publish | ScheduleController@publishAll | Publish all draft shifts in date range |
+
+**Group By Parameter:**
+- `group_by=department` (default) - Groups employees under department headers
+- `group_by=role` - Groups employees under business role headers
 
 **Draft Count Response (JSON):**
 ```json
@@ -1447,6 +1466,41 @@ Location::query()
 | GET | /leave-requests/{leaveRequest} | LeaveRequestController@show | View request |
 | POST | /leave-requests/{leaveRequest}/review | LeaveRequestController@review | Approve/Reject |
 
+### 6.1.1 Shift Validation
+
+**Shift Overlap Validation:**
+
+Both `StoreShiftRequest` and `UpdateShiftRequest` include server-side validation to prevent overlapping shifts for the same employee.
+
+```php
+// Validation rule in user_id field
+function ($attribute, $value, $fail) {
+    // Check for overlapping shifts
+    if ($this->hasOverlappingShift($value, $date, $startTime, $endTime, $excludeShiftId)) {
+        $fail('This shift overlaps with another shift for this employee.');
+    }
+}
+```
+
+**Overlap Detection Algorithm:**
+1. Query existing shifts for the same user on the same date
+2. Convert times to minutes since midnight for comparison
+3. Handle overnight shifts (end time < start time = crosses midnight)
+4. Two shifts overlap if: `start1 < end2 AND start2 < end1`
+
+**Helper Methods in Request Classes:**
+- `hasOverlappingShift(userId, date, startTime, endTime, excludeShiftId)` - Checks for conflicts
+- `shiftsOverlap(start1, end1, start2, end2)` - Compares two time ranges
+- `timeToMinutes(time)` - Converts HH:MM to minutes since midnight
+
+**Overnight Shift Handling:**
+```php
+// If end time is before start time, add 24 hours (1440 minutes)
+if ($endMin <= $startMin) {
+    $endMin += 1440;
+}
+```
+
 #### User Filter Preferences Routes
 
 | Method | URI | Controller | Description |
@@ -1460,18 +1514,26 @@ Location::query()
   "filter_context": "schedule",
   "location_id": 1,
   "department_id": 2,
-  "business_role_id": 3
+  "business_role_id": 3,
+  "group_by": "department"
 }
 ```
+
+**Filter Contexts:**
+- `schedule` - Week view filter defaults
+- `schedule_day` - Day view filter defaults
 
 **Response (GET):**
 ```json
 {
   "location_id": 1,
   "department_id": 2,
-  "business_role_id": 3
+  "business_role_id": 3,
+  "group_by": "department"
 }
 ```
+
+**Note:** The `group_by` value is stored in the `additional_filters` JSON column and retrieved via the `getFilter()` helper method on the model.
 
 ### 6.2 API Routes (v1 - Placeholder)
 
@@ -2028,6 +2090,7 @@ Add to crontab:
 | 1.0.0 | 2024-01-15 | Claude | Initial Phase 1 implementation |
 | 1.1.0 | 2025-01-25 | Claude | Added Day view, Draft/Publish workflow, TenantSettings, Notifications |
 | 1.2.0 | 2025-01-25 | Claude | Removed rotas table and consolidated migrations for fresh install |
+| 1.3.0 | 2025-01-25 | Claude | Added Group By feature, shift overlap validation, bookmark for day view |
 
 ---
 

@@ -70,6 +70,13 @@ class ScheduleController extends Controller
             return $primaryRole?->department_id ?? 0;
         });
 
+        // Group users by their primary role
+        $usersByRole = $users->groupBy(function ($user) {
+            $primaryRole = $user->businessRoles->where('pivot.is_primary', true)->first();
+
+            return $primaryRole?->id ?? 0;
+        });
+
         // Create a shifts lookup for quick access: [user_id][date_string] => [shifts]
         $shiftsLookup = [];
         foreach ($shifts as $shift) {
@@ -120,6 +127,9 @@ class ScheduleController extends Controller
         $assignedShifts = $shifts->whereNotNull('user_id')->count();
         $unassignedShifts = $shifts->whereNull('user_id')->count();
 
+        // Get grouping preference (department or role)
+        $groupBy = $request->query('group_by', 'department');
+
         return view('schedule.index', compact(
             'startDate',
             'endDate',
@@ -129,6 +139,7 @@ class ScheduleController extends Controller
             'businessRoles',
             'users',
             'usersByDepartment',
+            'usersByRole',
             'shiftsLookup',
             'unassignedShiftsLookup',
             'leaveLookup',
@@ -138,7 +149,8 @@ class ScheduleController extends Controller
             'totalHours',
             'assignedShifts',
             'unassignedShifts',
-            'draftShiftsCount'
+            'draftShiftsCount',
+            'groupBy'
         ));
     }
 
@@ -197,6 +209,16 @@ class ScheduleController extends Controller
             return $primaryRole?->department_id ?? 0;
         });
 
+        // Group users by their primary role
+        $usersByRole = $users->groupBy(function ($user) {
+            $primaryRole = $user->businessRoles->where('pivot.is_primary', true)->first();
+
+            return $primaryRole?->id ?? 0;
+        });
+
+        // Get grouping preference (department or role)
+        $groupBy = $request->query('group_by', 'department');
+
         // Create a shifts lookup: [user_id] => [shifts]
         $shiftsLookup = [];
         foreach ($shifts as $shift) {
@@ -243,6 +265,7 @@ class ScheduleController extends Controller
             'businessRoles',
             'users',
             'usersByDepartment',
+            'usersByRole',
             'shiftsLookup',
             'unassignedShifts',
             'leaveLookup',
@@ -252,7 +275,8 @@ class ScheduleController extends Controller
             'totalHours',
             'assignedShiftsCount',
             'unassignedShiftsCount',
-            'draftShiftsCount'
+            'draftShiftsCount',
+            'groupBy'
         ));
     }
 
