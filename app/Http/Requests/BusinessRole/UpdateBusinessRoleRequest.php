@@ -8,7 +8,7 @@ class UpdateBusinessRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $businessRole = $this->route('businessRole');
+        $businessRole = $this->route('business_role');
 
         return $this->user()->canManageDepartment($businessRole->department);
     }
