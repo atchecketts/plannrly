@@ -9,26 +9,161 @@
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-brand-50: #f0f0ff;
-    --color-brand-100: #e0e0ff;
-    --color-brand-200: #c4c0ff;
-    --color-brand-300: #a090ff;
-    --color-brand-400: #7c5cff;
-    --color-brand-500: #5a30f0;
-    --color-brand-600: #4a20d0;
-    --color-brand-700: #3a15b0;
-    --color-brand-800: #2a0fa0;
-    --color-brand-900: #160092;
-    --color-brand-950: #0d0060;
+    /* ==============================================
+       Brand Colors - Primary: #160092 (Deep Purple)
+       ============================================== */
+    --color-brand-50: #f5f3ff;
+    --color-brand-100: #ede9fe;
+    --color-brand-200: #ddd6fe;
+    --color-brand-300: #c4b5fd;
+    --color-brand-400: #a78bfa;
+    --color-brand-500: #8b5cf6;
+    --color-brand-600: #7c3aed;
+    --color-brand-700: #6d28d9;
+    --color-brand-800: #5b21b6;
+    --color-brand-900: #4c1d95;
+    --color-brand-950: #160092;
+
+    /* ==============================================
+       Primary Colors - For buttons and key actions
+       ============================================== */
+    --color-primary-50: #f5f3ff;
+    --color-primary-100: #ede9fe;
+    --color-primary-200: #ddd6fe;
+    --color-primary-300: #c4b5fd;
+    --color-primary-400: #a78bfa;
+    --color-primary-500: #7c3aed;
+    --color-primary-600: #160092;
+    --color-primary-700: #130080;
+    --color-primary-800: #0f006b;
+    --color-primary-900: #0b0052;
+    --color-primary-950: #060030;
+
+    /* ==============================================
+       Surface Colors - Purple-tinted dark backgrounds
+       ============================================== */
+    --color-surface-50: #f8f7ff;
+    --color-surface-100: #f0eeff;
+    --color-surface-200: #e4e0ff;
+    --color-surface-300: #ccc4ff;
+    --color-surface-400: #a99aff;
+    --color-surface-500: #8066ff;
+    --color-surface-600: #5c3df7;
+    --color-surface-700: #2d2a4a;
+    --color-surface-800: #1e1b35;
+    --color-surface-850: #17152a;
+    --color-surface-900: #110f20;
+    --color-surface-950: #0a0914;
+
+    /* ==============================================
+       Accent Colors - Complementary highlights
+       ============================================== */
+    --color-accent-50: #fdf4ff;
+    --color-accent-100: #fae8ff;
+    --color-accent-200: #f5d0fe;
+    --color-accent-300: #f0abfc;
+    --color-accent-400: #e879f9;
+    --color-accent-500: #d946ef;
+    --color-accent-600: #c026d3;
+    --color-accent-700: #a21caf;
+    --color-accent-800: #86198f;
+    --color-accent-900: #701a75;
+    --color-accent-950: #4a044e;
+
+    /* ==============================================
+       Semantic Colors
+       ============================================== */
+    /* Success - Green with slight cool tint */
+    --color-success-50: #ecfdf5;
+    --color-success-100: #d1fae5;
+    --color-success-200: #a7f3d0;
+    --color-success-300: #6ee7b7;
+    --color-success-400: #34d399;
+    --color-success-500: #10b981;
+    --color-success-600: #059669;
+    --color-success-700: #047857;
+    --color-success-800: #065f46;
+    --color-success-900: #064e3b;
+    --color-success-950: #022c22;
+
+    /* Warning - Amber */
+    --color-warning-50: #fffbeb;
+    --color-warning-100: #fef3c7;
+    --color-warning-200: #fde68a;
+    --color-warning-300: #fcd34d;
+    --color-warning-400: #fbbf24;
+    --color-warning-500: #f59e0b;
+    --color-warning-600: #d97706;
+    --color-warning-700: #b45309;
+    --color-warning-800: #92400e;
+    --color-warning-900: #78350f;
+    --color-warning-950: #451a03;
+
+    /* Danger/Error - Red with slight purple undertone */
+    --color-danger-50: #fef2f2;
+    --color-danger-100: #fee2e2;
+    --color-danger-200: #fecaca;
+    --color-danger-300: #fca5a5;
+    --color-danger-400: #f87171;
+    --color-danger-500: #ef4444;
+    --color-danger-600: #dc2626;
+    --color-danger-700: #b91c1c;
+    --color-danger-800: #991b1b;
+    --color-danger-900: #7f1d1d;
+    --color-danger-950: #450a0a;
+
+    /* Info - Blue with purple tint */
+    --color-info-50: #eff6ff;
+    --color-info-100: #dbeafe;
+    --color-info-200: #bfdbfe;
+    --color-info-300: #93c5fd;
+    --color-info-400: #60a5fa;
+    --color-info-500: #3b82f6;
+    --color-info-600: #2563eb;
+    --color-info-700: #1d4ed8;
+    --color-info-800: #1e40af;
+    --color-info-900: #1e3a8a;
+    --color-info-950: #172554;
 }
 
 /* Drag and drop styles */
 .drag-over {
-    background-color: rgba(90, 48, 240, 0.2) !important;
-    outline: 2px dashed #5a30f0;
+    background-color: rgba(22, 0, 146, 0.25) !important;
+    outline: 2px dashed var(--color-brand-500);
     outline-offset: -2px;
 }
 
 .dragging {
     opacity: 0.5;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-surface-900);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-surface-700);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-600);
+}
+
+/* Focus ring style */
+*:focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+    background-color: rgba(124, 58, 237, 0.3);
+    color: white;
 }
