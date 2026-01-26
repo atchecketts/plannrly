@@ -429,4 +429,33 @@ class ScheduleController extends Controller
             'dayShifts'
         ));
     }
+
+    public function mobileDay(Request $request): View
+    {
+        $user = auth()->user();
+
+        $selectedDate = $request->query('date')
+            ? Carbon::parse($request->query('date'))
+            : now();
+
+        // Get shifts for this date
+        $shifts = Shift::with(['user', 'department', 'businessRole'])
+            ->visibleToUser($user)
+            ->whereDate('date', $selectedDate)
+            ->orderBy('start_time')
+            ->get();
+
+        // Calculate stats
+        $totalShifts = $shifts->count();
+        $totalHours = $shifts->sum('working_hours');
+        $unassignedShiftsCount = $shifts->whereNull('user_id')->count();
+
+        return view('schedule.admin-mobile-day', compact(
+            'selectedDate',
+            'shifts',
+            'totalShifts',
+            'totalHours',
+            'unassignedShiftsCount'
+        ));
+    }
 }

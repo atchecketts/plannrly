@@ -51,6 +51,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('schedule', [ScheduleController::class, 'index'])->name('schedule.index');
     Route::get('schedule/day', [ScheduleController::class, 'day'])->name('schedule.day');
     Route::get('schedule/mobile', [ScheduleController::class, 'mobile'])->name('schedule.mobile');
+    Route::get('schedule/mobile/day', [ScheduleController::class, 'mobileDay'])->name('schedule.mobile.day');
     Route::get('schedule/draft-count', [ScheduleController::class, 'draftCount'])->name('schedule.draft-count');
     Route::post('schedule/publish', [ScheduleController::class, 'publishAll'])->name('schedule.publish');
 
