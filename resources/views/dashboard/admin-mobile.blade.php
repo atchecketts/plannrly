@@ -23,7 +23,7 @@
     <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
             <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Today's Shifts</h2>
-            <a href="{{ route('schedule.day') }}" class="text-sm text-brand-400">View All</a>
+            <a href="{{ route('schedule.mobile') }}" class="text-sm text-brand-400">View All</a>
         </div>
 
         @if($todayShifts->isEmpty())
@@ -111,7 +111,7 @@
     <div>
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
         <div class="grid grid-cols-2 gap-3">
-            <a href="{{ route('schedule.index') }}" class="bg-gray-900 rounded-lg border border-gray-800 p-4 flex items-center gap-3">
+            <a href="{{ route('schedule.mobile') }}" class="bg-gray-900 rounded-lg border border-gray-800 p-4 flex items-center gap-3">
                 <div class="w-10 h-10 bg-brand-900/50 rounded-lg flex items-center justify-center">
                     <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
