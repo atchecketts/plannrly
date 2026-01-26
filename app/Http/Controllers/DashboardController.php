@@ -40,16 +40,9 @@ class DashboardController extends Controller
 
     protected function superAdminDashboard(): View
     {
-        $stats = [
-            'total_tenants' => \App\Models\Tenant::count(),
-            'active_tenants' => \App\Models\Tenant::active()->count(),
-            'total_users' => User::count(),
-            'new_tenants_this_month' => \App\Models\Tenant::whereMonth('created_at', now()->month)->count(),
-        ];
-
-        $recentTenants = \App\Models\Tenant::latest()->take(5)->get();
-
-        return view('dashboard.super-admin', compact('stats', 'recentTenants'));
+        // Super admins use the same mobile dashboard as regular admins
+        // They see all data for their tenant without filtering
+        return $this->adminDashboard();
     }
 
     protected function adminDashboard(?int $locationId = null, ?int $departmentId = null): View

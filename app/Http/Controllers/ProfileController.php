@@ -17,7 +17,7 @@ class ProfileController extends Controller
         $user->load(['businessRoles.department']);
 
         // Return admin profile for non-employee users
-        if ($user->isAdmin() || $user->isLocationAdmin() || $user->isDepartmentAdmin()) {
+        if ($user->isSuperAdmin() || $user->isAdmin() || $user->isLocationAdmin() || $user->isDepartmentAdmin()) {
             return view('profile.admin-show', [
                 'user' => $user,
             ]);
