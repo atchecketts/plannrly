@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full" style="margin:0;padding:0;width:100%;height:100%;">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,7 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Inter', sans-serif; }
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; }
         .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
     </style>
     <script>
@@ -36,8 +37,8 @@
         }
     </script>
 </head>
-<body class="h-full bg-gray-950">
-    <div class="flex flex-col h-full bg-gray-950">
+<body class="h-full bg-gray-950 m-0 p-0">
+    <div class="flex flex-col min-h-full w-full bg-gray-950" style="margin:0;padding:0;width:100vw;min-height:100vh;">
         <!-- Status Bar Spacer -->
         <div class="bg-brand-900 h-6"></div>
 
