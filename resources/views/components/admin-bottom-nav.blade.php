@@ -1,7 +1,7 @@
 @props(['active' => 'home'])
 
 <nav class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 safe-area-bottom z-50">
-    <div class="grid grid-cols-5 h-16 max-w-lg mx-auto">
+    <div class="grid grid-cols-5 h-16 w-full">
         <a href="{{ route('dashboard') }}"
            class="flex flex-col items-center justify-center {{ $active === 'home' ? 'text-brand-400' : 'text-gray-500' }}">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
