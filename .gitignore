@@ -26,3 +26,5 @@ Thumbs.db
 # Project exclude paths
 /storage/app/
 /storage/framework/
+/nul
+/PLAN_STATUS_AUTOMATION.md

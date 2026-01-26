@@ -70,7 +70,10 @@
       "Bash(powershell.exe -Command:*)",
       "Bash(C:UsersatcheAppDataRoamingComposervendorbinherd.bat php artisan test --compact --filter=ShiftSwapAdminTest)",
       "Bash(cmd.exe /c \"cd /d C:\\\\websites\\\\plannrly && herd php artisan test --compact --filter=ShiftSwapAdminTest\")",
-      "Bash(cmd.exe /c \"cd /d C:\\\\websites\\\\plannrly && C:\\\\Users\\\\atche\\\\.config\\\\herd\\\\bin\\\\php84\\\\php.exe artisan test --compact --filter=ShiftSwapAdminTest\")"
+      "Bash(cmd.exe /c \"cd /d C:\\\\websites\\\\plannrly && C:\\\\Users\\\\atche\\\\.config\\\\herd\\\\bin\\\\php84\\\\php.exe artisan test --compact --filter=ShiftSwapAdminTest\")",
+      "Bash(vendorbinphpunit --no-coverage)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

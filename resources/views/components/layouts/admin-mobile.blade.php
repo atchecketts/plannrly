@@ -22,7 +22,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="h-full bg-gray-950">
-    <div class="flex flex-col h-full max-w-md mx-auto bg-gray-950">
+    <div class="flex flex-col h-full w-full bg-gray-950">
         <!-- Status Bar Spacer -->
         <div class="bg-brand-900 h-6 safe-area-top"></div>
 
@@ -50,7 +50,7 @@
         @endif
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto">
+        <main class="flex-1 overflow-y-auto overflow-x-hidden">
             @if (session('success'))
                 <div class="mx-4 mt-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3">
                     <div class="flex items-center gap-2">

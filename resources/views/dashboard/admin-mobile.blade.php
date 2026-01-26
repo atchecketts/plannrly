@@ -1,6 +1,6 @@
 <x-layouts.admin-mobile title="Dashboard" active="home">
-    <!-- Main Content - overlaps header -->
-    <div class="px-4 -mt-4">
+    <!-- Main Content -->
+    <div class="px-4 pt-4">
         <!-- Overview Card (like employee's Today's Shift Card) -->
         <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
             <div class="p-4 border-b border-gray-800">
