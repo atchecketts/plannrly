@@ -158,8 +158,7 @@ class DashboardController extends Controller
         // Get shifts grouped by department for timeline view
         $shiftsByDepartment = $todayShifts->groupBy('department_id');
 
-        // Return mobile view for all admins
-        return view('dashboard.admin-mobile', compact('stats', 'todayShifts', 'pendingLeave', 'pendingSwaps', 'shiftsByDepartment'));
+        return view('dashboard.admin', compact('stats', 'todayShifts', 'pendingLeave', 'pendingSwaps', 'shiftsByDepartment'));
     }
 
     protected function locationAdminDashboard(): View
