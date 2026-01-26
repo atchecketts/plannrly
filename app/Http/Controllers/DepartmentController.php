@@ -23,6 +23,23 @@ class DepartmentController extends Controller
         return view('departments.index', compact('departments'));
     }
 
+    public function mobile(): View
+    {
+        $this->authorize('viewAny', Department::class);
+
+        $departments = Department::with('location')
+            ->withCount('businessRoles')
+            ->orderBy('name')
+            ->get();
+
+        $stats = [
+            'active' => $departments->where('is_active', true)->count(),
+            'inactive' => $departments->where('is_active', false)->count(),
+        ];
+
+        return view('departments.admin-mobile-index', compact('departments', 'stats'));
+    }
+
     public function create(): View
     {
         $this->authorize('create', Department::class);

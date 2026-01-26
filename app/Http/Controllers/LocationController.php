@@ -22,6 +22,23 @@ class LocationController extends Controller
         return view('locations.index', compact('locations'));
     }
 
+    public function mobile(): View
+    {
+        $this->authorize('viewAny', Location::class);
+
+        $locations = Location::with('departments')
+            ->withCount('departments')
+            ->orderBy('name')
+            ->get();
+
+        $stats = [
+            'active' => $locations->where('is_active', true)->count(),
+            'inactive' => $locations->where('is_active', false)->count(),
+        ];
+
+        return view('locations.admin-mobile-index', compact('locations', 'stats'));
+    }
+
     public function create(): View
     {
         $this->authorize('create', Location::class);

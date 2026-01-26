@@ -39,10 +39,13 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    Route::get('locations/mobile', [LocationController::class, 'mobile'])->name('locations.mobile');
     Route::resource('locations', LocationController::class);
 
+    Route::get('departments/mobile', [DepartmentController::class, 'mobile'])->name('departments.mobile');
     Route::resource('departments', DepartmentController::class)->except(['show']);
 
+    Route::get('business-roles/mobile', [BusinessRoleController::class, 'mobile'])->name('business-roles.mobile');
     Route::resource('business-roles', BusinessRoleController::class)->except(['show']);
 
     Route::get('users/mobile', [UserController::class, 'mobile'])->name('users.mobile');
