@@ -92,6 +92,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::get('my-leave', [LeaveRequestController::class, 'myRequests'])->name('my-leave.index');
+    Route::get('my-leave/create', [LeaveRequestController::class, 'myCreate'])->name('my-leave.create');
 });
 
 Route::prefix('samples')->group(function () {

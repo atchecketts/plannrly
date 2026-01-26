@@ -1,6 +1,9 @@
 <x-layouts.mobile title="Time Clock" active="clock" :showHeader="false">
+    <!-- Status Bar Spacer -->
+    <div class="bg-brand-900 h-6"></div>
+
     <!-- Header -->
-    <header class="bg-brand-600 text-white px-4 pb-6 pt-8">
+    <header class="bg-brand-900 text-white px-4 pb-6 pt-2">
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm text-brand-200">{{ now()->format('l') }}</p>

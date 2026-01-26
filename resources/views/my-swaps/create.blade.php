@@ -1,6 +1,9 @@
 <x-layouts.mobile title="Request Swap" active="swaps" :showHeader="false">
+    <!-- Status Bar Spacer -->
+    <div class="bg-brand-900 h-6"></div>
+
     <!-- Header -->
-    <header class="bg-brand-600 text-white px-4 pb-6 pt-8">
+    <header class="bg-brand-900 text-white px-4 pb-6 pt-2">
         <div class="flex items-center gap-3">
             <a href="{{ route('my-swaps.index') }}" class="p-2 -ml-2 bg-white/10 rounded-lg">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +103,7 @@
                     Cancel
                 </a>
                 <button type="submit"
-                        class="flex items-center justify-center py-3 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-500 transition-colors">
+                        class="flex items-center justify-center py-3 bg-brand-900 text-white font-medium rounded-lg hover:bg-brand-800 transition-colors">
                     Submit Request
                 </button>
             </div>

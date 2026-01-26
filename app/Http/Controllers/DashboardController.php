@@ -52,7 +52,7 @@ class DashboardController extends Controller
         return view('dashboard.super-admin', compact('stats', 'recentTenants'));
     }
 
-    protected function adminDashboard(): View
+    protected function adminDashboard(?int $locationId = null, ?int $departmentId = null): View
     {
         $user = auth()->user();
         $tenantId = $user->tenant_id;
@@ -60,23 +60,45 @@ class DashboardController extends Controller
         // Calculate hours scheduled this week
         $weekStart = now()->startOfWeek();
         $weekEnd = now()->endOfWeek();
-        $hoursThisWeek = Shift::where('tenant_id', $tenantId)
+
+        // Build base query with optional location/department filtering
+        $shiftsQuery = Shift::where('tenant_id', $tenantId);
+        if ($locationId) {
+            $shiftsQuery->where('location_id', $locationId);
+        }
+        if ($departmentId) {
+            $shiftsQuery->where('department_id', $departmentId);
+        }
+
+        $hoursThisWeek = (clone $shiftsQuery)
             ->whereBetween('date', [$weekStart, $weekEnd])
             ->whereNotNull('user_id')
             ->get()
             ->sum('working_hours');
 
         // Count employees on leave today
-        $onLeaveToday = LeaveRequest::where('tenant_id', $tenantId)
+        $leaveQuery = LeaveRequest::where('tenant_id', $tenantId)
             ->where('status', LeaveRequestStatus::Approved)
             ->where('start_date', '<=', today())
-            ->where('end_date', '>=', today())
-            ->count();
+            ->where('end_date', '>=', today());
+        $onLeaveToday = $leaveQuery->count();
+
+        // Employee count based on scope
+        $employeeQuery = User::where('tenant_id', $tenantId);
+        if ($locationId || $departmentId) {
+            $employeeQuery->whereHas('businessRoles', function ($q) use ($locationId, $departmentId) {
+                if ($departmentId) {
+                    $q->where('department_id', $departmentId);
+                } elseif ($locationId) {
+                    $q->whereHas('department', fn ($d) => $d->where('location_id', $locationId));
+                }
+            });
+        }
 
         $stats = [
-            'total_employees' => User::where('tenant_id', $tenantId)->count(),
-            'active_employees' => User::where('tenant_id', $tenantId)->active()->count(),
-            'on_duty_today' => Shift::where('tenant_id', $tenantId)
+            'total_employees' => (clone $employeeQuery)->count(),
+            'active_employees' => (clone $employeeQuery)->active()->count(),
+            'on_duty_today' => (clone $shiftsQuery)
                 ->whereDate('date', today())
                 ->whereNotNull('user_id')
                 ->where('status', ShiftStatus::Published)
@@ -86,18 +108,26 @@ class DashboardController extends Controller
             'pending_leave_requests' => LeaveRequest::where('tenant_id', $tenantId)
                 ->where('status', LeaveRequestStatus::Requested)
                 ->count(),
-            'unassigned_shifts' => Shift::where('tenant_id', $tenantId)
+            'unassigned_shifts' => (clone $shiftsQuery)
                 ->whereNull('user_id')
                 ->whereDate('date', '>=', today())
                 ->whereDate('date', '<=', $weekEnd)
                 ->count(),
-            'pending_shift_swaps' => ShiftSwapRequest::whereHas('requestingShift', function ($query) use ($tenantId) {
+            'pending_shift_swaps' => ShiftSwapRequest::whereHas('requestingShift', function ($query) use ($tenantId, $locationId, $departmentId) {
                 $query->where('tenant_id', $tenantId);
+                if ($locationId) {
+                    $query->where('location_id', $locationId);
+                }
+                if ($departmentId) {
+                    $query->where('department_id', $departmentId);
+                }
             })->where('status', SwapRequestStatus::Pending)->count(),
         ];
 
         $todayShifts = Shift::with(['user', 'department', 'businessRole', 'location'])
             ->where('tenant_id', $tenantId)
+            ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->whereDate('date', today())
             ->orderBy('start_time')
             ->get();
@@ -115,8 +145,14 @@ class DashboardController extends Controller
             'requestingShift.businessRole',
             'targetShift.user',
         ])
-            ->whereHas('requestingShift', function ($query) use ($tenantId) {
+            ->whereHas('requestingShift', function ($query) use ($tenantId, $locationId, $departmentId) {
                 $query->where('tenant_id', $tenantId);
+                if ($locationId) {
+                    $query->where('location_id', $locationId);
+                }
+                if ($departmentId) {
+                    $query->where('department_id', $departmentId);
+                }
             })
             ->where('status', SwapRequestStatus::Pending)
             ->latest()
@@ -126,17 +162,38 @@ class DashboardController extends Controller
         // Get shifts grouped by department for timeline view
         $shiftsByDepartment = $todayShifts->groupBy('department_id');
 
-        return view('dashboard.admin', compact('stats', 'todayShifts', 'pendingLeave', 'pendingSwaps', 'shiftsByDepartment'));
+        // Return mobile view for all admins
+        return view('dashboard.admin-mobile', compact('stats', 'todayShifts', 'pendingLeave', 'pendingSwaps', 'shiftsByDepartment'));
     }
 
     protected function locationAdminDashboard(): View
     {
-        return view('dashboard.location-admin');
+        $user = auth()->user();
+
+        // Get the location(s) this user manages
+        $locationIds = $user->roleAssignments()
+            ->where('system_role', \App\Enums\SystemRole::LocationAdmin->value)
+            ->whereNotNull('location_id')
+            ->pluck('location_id');
+
+        $locationId = $locationIds->first();
+
+        return $this->adminDashboard(locationId: $locationId);
     }
 
     protected function departmentAdminDashboard(): View
     {
-        return view('dashboard.department-admin');
+        $user = auth()->user();
+
+        // Get the department(s) this user manages
+        $departmentIds = $user->roleAssignments()
+            ->where('system_role', \App\Enums\SystemRole::DepartmentAdmin->value)
+            ->whereNotNull('department_id')
+            ->pluck('department_id');
+
+        $departmentId = $departmentIds->first();
+
+        return $this->adminDashboard(departmentId: $departmentId);
     }
 
     protected function employeeDashboard(): View

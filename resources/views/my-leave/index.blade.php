@@ -1,12 +1,15 @@
 <x-layouts.mobile title="My Leave" active="profile" :showHeader="false">
+    <!-- Status Bar Spacer -->
+    <div class="bg-brand-900 h-6"></div>
+
     <!-- Header -->
-    <header class="bg-brand-600 text-white px-4 pb-6 pt-8">
+    <header class="bg-brand-900 text-white px-4 pb-6 pt-2">
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-xl font-bold">My Leave</h1>
                 <p class="text-sm text-brand-200 mt-1">View and request time off</p>
             </div>
-            <a href="{{ route('leave-requests.create') }}" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
+            <a href="{{ route('my-leave.create') }}" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
@@ -78,7 +81,7 @@
                         </svg>
                     </div>
                     <p class="text-sm text-gray-500">No leave requests</p>
-                    <a href="{{ route('leave-requests.create') }}" class="inline-block mt-3 text-sm text-brand-400 font-medium">
+                    <a href="{{ route('my-leave.create') }}" class="inline-block mt-3 text-sm text-brand-400 font-medium">
                         Request Time Off
                     </a>
                 </div>

@@ -168,7 +168,7 @@
             <div>
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Leave Balance</h2>
-                    <a href="{{ route('leave-requests.create') }}" class="text-sm text-brand-400 font-medium">Request Leave</a>
+                    <a href="{{ route('my-leave.create') }}" class="text-sm text-brand-400 font-medium">Request Leave</a>
                 </div>
                 @foreach($leaveBalances->take(2) as $balance)
                     <div class="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-3">

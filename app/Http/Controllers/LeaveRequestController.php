@@ -64,8 +64,11 @@ class LeaveRequestController extends Controller
             $leaveRequest->submit();
         }
 
+        $user = auth()->user();
+        $route = $user->isEmployee() ? 'my-leave.index' : 'leave-requests.index';
+
         return redirect()
-            ->route('leave-requests.index')
+            ->route($route)
             ->with('success', 'Leave request created successfully.');
     }
 
@@ -115,6 +118,16 @@ class LeaveRequestController extends Controller
         return redirect()
             ->route('leave-requests.index')
             ->with('success', 'Leave request cancelled.');
+    }
+
+    public function myCreate(): View
+    {
+        $leaveTypes = LeaveType::active()
+            ->forTenant(auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get();
+
+        return view('my-leave.create', compact('leaveTypes'));
     }
 
     public function myRequests(): View

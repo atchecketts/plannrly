@@ -1,6 +1,9 @@
 <x-layouts.mobile title="My Shifts" active="shifts" :showHeader="false">
+    <!-- Status Bar Spacer -->
+    <div class="bg-brand-900 h-6"></div>
+
     <!-- Header -->
-    <header class="bg-brand-600 text-white px-4 pb-6 pt-8">
+    <header class="bg-brand-900 text-white px-4 pb-6 pt-2">
         <div class="flex items-center justify-between">
             <h1 class="text-xl font-bold">My Shifts</h1>
             <div class="flex items-center gap-2">

@@ -1,6 +1,9 @@
 <x-layouts.mobile title="Shift Swaps" active="swaps" :showHeader="false">
+    <!-- Status Bar Spacer -->
+    <div class="bg-brand-900 h-6"></div>
+
     <!-- Header -->
-    <header class="bg-brand-600 text-white px-4 pb-6 pt-8">
+    <header class="bg-brand-900 text-white px-4 pb-6 pt-2">
         <h1 class="text-xl font-bold">Shift Swaps</h1>
         <p class="text-sm text-brand-200 mt-1">Manage your swap requests</p>
     </header>

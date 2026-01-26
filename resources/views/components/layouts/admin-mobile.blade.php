@@ -34,16 +34,7 @@
                     <div>
                         <p class="font-semibold">Hello, {{ auth()->user()->first_name }}!</p>
                         <p class="text-sm text-brand-200">
-                            @php
-                                $primaryRole = auth()->user()->businessRoles->firstWhere('pivot.is_primary', true)
-                                    ?? auth()->user()->businessRoles->first();
-                            @endphp
-                            @if($primaryRole)
-                                @if($primaryRole->department)
-                                    {{ $primaryRole->department->name }} &bull;
-                                @endif
-                                {{ $primaryRole->name }}
-                            @endif
+                            {{ auth()->user()->getHighestRole()?->label() ?? 'Admin' }}
                         </p>
                     </div>
                 </div>
@@ -87,7 +78,7 @@
         </main>
 
         <!-- Bottom Navigation -->
-        <x-bottom-nav :active="$active" />
+        <x-admin-bottom-nav :active="$active" />
     </div>
 </body>
 </html>
