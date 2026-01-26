@@ -37,7 +37,7 @@
     </script>
 </head>
 <body class="h-full bg-gray-950">
-    <div class="flex flex-col h-full max-w-md mx-auto bg-gray-950">
+    <div class="flex flex-col h-full bg-gray-950">
         <!-- Status Bar Spacer -->
         <div class="bg-brand-900 h-6"></div>
 
@@ -232,7 +232,6 @@
                 </div>
             </div>
 
-            <div class="h-20"></div>
         </main>
 
         <!-- Bottom Navigation -->
