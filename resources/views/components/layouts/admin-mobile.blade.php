@@ -167,11 +167,7 @@
                         <p class="text-xs text-surface-500">{{ auth()->user()->tenant?->name ?? 'Plannrly' }}</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-primary-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-lg shadow-primary-600/20">
-                        {{ substr(auth()->user()->first_name, 0, 1) }}{{ substr(auth()->user()->last_name, 0, 1) }}
-                    </div>
-                </div>
+                <x-logo class="h-8" />
             </div>
         </header>
 
