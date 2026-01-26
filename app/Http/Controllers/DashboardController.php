@@ -98,6 +98,9 @@ class DashboardController extends Controller
                 ->count(),
             'on_leave_today' => $onLeaveToday,
             'hours_this_week' => round($hoursThisWeek),
+            'total_shifts_this_week' => (clone $shiftsQuery)
+                ->whereBetween('date', [$weekStart, $weekEnd])
+                ->count(),
             'pending_leave_requests' => LeaveRequest::where('tenant_id', $tenantId)
                 ->where('status', LeaveRequestStatus::Requested)
                 ->count(),
