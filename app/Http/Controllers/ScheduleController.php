@@ -366,4 +366,67 @@ class ScheduleController extends Controller
             'message' => "{$publishedCount} shift(s) published successfully.",
         ]);
     }
+
+    public function mobile(Request $request): View
+    {
+        $user = auth()->user();
+
+        // Determine the week to display
+        $startDate = $request->query('start')
+            ? Carbon::parse($request->query('start'))->startOfWeek()
+            : now()->startOfWeek();
+
+        $endDate = $startDate->copy()->endOfWeek();
+
+        // Build the week dates array
+        $weekDates = [];
+        $currentDate = $startDate->copy();
+        while ($currentDate <= $endDate) {
+            $weekDates[] = $currentDate->copy();
+            $currentDate->addDay();
+        }
+
+        // Get shifts for this week
+        $shifts = Shift::with(['user', 'department', 'businessRole'])
+            ->visibleToUser($user)
+            ->whereBetween('date', [$startDate, $endDate])
+            ->orderBy('start_time')
+            ->get();
+
+        // Calculate shift counts per day
+        $shiftCounts = [];
+        foreach ($weekDates as $date) {
+            $dateStr = $date->format('Y-m-d');
+            $shiftCounts[$dateStr] = $shifts->filter(fn ($s) => $s->date->format('Y-m-d') === $dateStr)->count();
+        }
+
+        // Calculate stats
+        $stats = [
+            'total_shifts' => $shifts->count(),
+            'total_hours' => round($shifts->sum('working_hours')),
+            'unassigned' => $shifts->whereNull('user_id')->count(),
+        ];
+
+        // Check if a specific day is selected
+        $selectedDate = $request->query('day')
+            ? Carbon::parse($request->query('day'))
+            : null;
+
+        $dayShifts = collect();
+        if ($selectedDate) {
+            $selectedDateStr = $selectedDate->format('Y-m-d');
+            $dayShifts = $shifts->filter(fn ($s) => $s->date->format('Y-m-d') === $selectedDateStr)->sortBy('start_time');
+        }
+
+        return view('schedule.admin-mobile-index', compact(
+            'startDate',
+            'endDate',
+            'weekDates',
+            'shifts',
+            'shiftCounts',
+            'stats',
+            'selectedDate',
+            'dayShifts'
+        ));
+    }
 }

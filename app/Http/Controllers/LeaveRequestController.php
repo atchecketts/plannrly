@@ -156,4 +156,32 @@ class LeaveRequestController extends Controller
             'upcomingApproved' => $upcomingApproved,
         ]);
     }
+
+    public function mobile(): View
+    {
+        $user = auth()->user();
+
+        $status = request()->query('status', 'pending');
+
+        $query = LeaveRequest::with(['user', 'leaveType', 'reviewedBy'])
+            ->orderByDesc('created_at');
+
+        if ($status === 'pending') {
+            $query->where('status', LeaveRequestStatus::Requested);
+        } elseif ($status === 'approved') {
+            $query->where('status', LeaveRequestStatus::Approved);
+        } elseif ($status === 'rejected') {
+            $query->where('status', LeaveRequestStatus::Rejected);
+        }
+
+        $leaveRequests = $query->paginate(15);
+
+        $pendingCount = LeaveRequest::where('status', LeaveRequestStatus::Requested)->count();
+
+        return view('leave-requests.admin-mobile-index', [
+            'leaveRequests' => $leaveRequests,
+            'status' => $status,
+            'pendingCount' => $pendingCount,
+        ]);
+    }
 }

@@ -29,6 +29,23 @@ class UserController extends Controller
         return view('users.index', compact('users'));
     }
 
+    public function mobile(): View
+    {
+        $this->authorize('viewAny', User::class);
+
+        $users = User::with(['roleAssignments', 'businessRoles.department'])
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('first_name')
+            ->get();
+
+        $stats = [
+            'active' => $users->where('is_active', true)->count(),
+            'inactive' => $users->where('is_active', false)->count(),
+        ];
+
+        return view('users.admin-mobile-index', compact('users', 'stats'));
+    }
+
     public function create(): View
     {
         $this->authorize('create', User::class);

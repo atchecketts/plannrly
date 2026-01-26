@@ -45,10 +45,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::resource('business-roles', BusinessRoleController::class)->except(['show']);
 
+    Route::get('users/mobile', [UserController::class, 'mobile'])->name('users.mobile');
     Route::resource('users', UserController::class);
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('schedule.index');
     Route::get('schedule/day', [ScheduleController::class, 'day'])->name('schedule.day');
+    Route::get('schedule/mobile', [ScheduleController::class, 'mobile'])->name('schedule.mobile');
     Route::get('schedule/draft-count', [ScheduleController::class, 'draftCount'])->name('schedule.draft-count');
     Route::post('schedule/publish', [ScheduleController::class, 'publishAll'])->name('schedule.publish');
 
@@ -60,6 +62,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('shifts/{shift}/publish', [ShiftController::class, 'publish'])->name('shifts.publish');
     Route::get('shifts/{shift}/available-users', [ShiftController::class, 'availableUsers'])->name('shifts.available-users');
 
+    Route::get('leave-requests/mobile', [LeaveRequestController::class, 'mobile'])->name('leave-requests.mobile');
     Route::resource('leave-requests', LeaveRequestController::class)->except(['edit', 'update']);
     Route::post('leave-requests/{leaveRequest}/submit', [LeaveRequestController::class, 'submit'])->name('leave-requests.submit');
     Route::post('leave-requests/{leaveRequest}/review', [LeaveRequestController::class, 'review'])->name('leave-requests.review');
