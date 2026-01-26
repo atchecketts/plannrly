@@ -41,5 +41,23 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Shift::class, ShiftPolicy::class);
         Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
         Gate::policy(ShiftSwapRequest::class, ShiftSwapPolicy::class);
+
+        $this->ensureDirectoriesExist();
+    }
+
+    protected function ensureDirectoriesExist(): void
+    {
+        $paths = [
+            storage_path('framework/cache'),
+            storage_path('framework/sessions'),
+            storage_path('framework/views'),
+        ];
+
+        foreach ($paths as $path) {
+            if (! is_dir($path)) {
+                mkdir($path, 0755, true);
+            }
+        }
+
     }
 }

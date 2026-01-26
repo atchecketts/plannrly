@@ -111,9 +111,13 @@
             <!-- Top Header -->
             <header class="bg-gray-900 border-b border-gray-800 px-6 py-4">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-2xl font-bold text-white">{{ $header ?? $title }}</h1>
-                    </div>
+                    @if(isset($header))
+                        {{ $header }}
+                    @else
+                        <div>
+                            <h1 class="text-2xl font-bold text-white">{{ $title }}</h1>
+                        </div>
+                    @endif
                     <!-- Mobile menu button -->
                     <div class="lg:hidden">
                         <x-logo class="h-8" />
