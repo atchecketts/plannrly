@@ -18,10 +18,10 @@
     --color-brand-300: #c4b5fd;
     --color-brand-400: #a78bfa;
     --color-brand-500: #8b5cf6;
-    --color-brand-600: #7c3aed;
-    --color-brand-700: #6d28d9;
-    --color-brand-800: #5b21b6;
-    --color-brand-900: #4c1d95;
+    --color-brand-600: #6d28d9;
+    --color-brand-700: #4d219c;
+    --color-brand-800: #3d1a7d;
+    --color-brand-900: #2e1a5f;
     --color-brand-950: #160092;
 
     /* ==============================================
@@ -127,14 +127,57 @@
 }
 
 /* Drag and drop styles */
-.drag-over {
-    background-color: rgba(22, 0, 146, 0.25) !important;
-    outline: 2px dashed var(--color-brand-500);
-    outline-offset: -2px;
+.dragging {
+    outline: 3px dashed var(--color-brand-500) !important;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+    z-index: 50;
 }
 
-.dragging {
-    opacity: 0.5;
+.schedule-cell.drag-over {
+    background-color: rgba(139, 92, 246, 0.15) !important;
+}
+
+/* Resize handles for shift bars */
+.resize-handle-left,
+.resize-handle-right {
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 10;
+}
+
+.shift-bar:hover .resize-handle-left,
+.shift-bar:hover .resize-handle-right {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.resize-handle-left:hover,
+.resize-handle-right:hover {
+    background: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Resizing state */
+.resizing {
+    user-select: none;
+}
+
+.resizing .shift-bar {
+    transition: none !important;
+}
+
+/* Time preview tooltip during drag/resize */
+.time-preview {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
 }
 
 /* Custom scrollbar for dark mode */

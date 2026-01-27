@@ -203,4 +203,129 @@ class User extends Authenticatable
     {
         return $query->where('tenant_id', $tenantId);
     }
+
+    /**
+     * Get all location IDs this user is associated with through their business roles.
+     */
+    public function getLocationIds(): array
+    {
+        return $this->businessRoles()
+            ->with('department')
+            ->get()
+            ->pluck('department.location_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Get all department IDs this user is associated with through their business roles.
+     */
+    public function getDepartmentIds(): array
+    {
+        return $this->businessRoles()
+            ->pluck('department_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Check if this user belongs to the given location through their business roles.
+     */
+    public function belongsToLocation(int $locationId): bool
+    {
+        return in_array($locationId, $this->getLocationIds());
+    }
+
+    /**
+     * Check if this user belongs to the given department through their business roles.
+     */
+    public function belongsToDepartment(int $departmentId): bool
+    {
+        return in_array($departmentId, $this->getDepartmentIds());
+    }
+
+    /**
+     * Get all location IDs this admin user can manage.
+     */
+    public function getManagedLocationIds(): array
+    {
+        if ($this->isSuperAdmin() || $this->isAdmin()) {
+            return Location::where('tenant_id', $this->tenant_id)->pluck('id')->toArray();
+        }
+
+        return $this->roleAssignments()
+            ->where('system_role', SystemRole::LocationAdmin->value)
+            ->whereNotNull('location_id')
+            ->pluck('location_id')
+            ->toArray();
+    }
+
+    /**
+     * Get all department IDs this admin user can manage.
+     */
+    public function getManagedDepartmentIds(): array
+    {
+        if ($this->isSuperAdmin() || $this->isAdmin()) {
+            return Department::where('tenant_id', $this->tenant_id)->pluck('id')->toArray();
+        }
+
+        $departmentIds = [];
+
+        // LocationAdmins can manage all departments in their locations
+        $locationIds = $this->getManagedLocationIds();
+        if (! empty($locationIds)) {
+            $departmentIds = Department::whereIn('location_id', $locationIds)->pluck('id')->toArray();
+        }
+
+        // DepartmentAdmins can manage their specific departments
+        $directDepartmentIds = $this->roleAssignments()
+            ->where('system_role', SystemRole::DepartmentAdmin->value)
+            ->whereNotNull('department_id')
+            ->pluck('department_id')
+            ->toArray();
+
+        return array_unique(array_merge($departmentIds, $directDepartmentIds));
+    }
+
+    /**
+     * Check if this admin user can manage the given user.
+     */
+    public function canManageUser(User $targetUser): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($this->tenant_id !== $targetUser->tenant_id) {
+            return false;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // LocationAdmin can manage users in their locations
+        if ($this->isLocationAdmin()) {
+            $managedLocationIds = $this->getManagedLocationIds();
+            $userLocationIds = $targetUser->getLocationIds();
+
+            // User must have at least one business role in a location the admin manages
+            return ! empty(array_intersect($managedLocationIds, $userLocationIds));
+        }
+
+        // DepartmentAdmin can manage users in their departments
+        if ($this->isDepartmentAdmin()) {
+            $managedDepartmentIds = $this->getManagedDepartmentIds();
+            $userDepartmentIds = $targetUser->getDepartmentIds();
+
+            // User must have at least one business role in a department the admin manages
+            return ! empty(array_intersect($managedDepartmentIds, $userDepartmentIds));
+        }
+
+        return false;
+    }
 }

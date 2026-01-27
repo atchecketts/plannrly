@@ -39,7 +39,7 @@ class StoreUserRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:50'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'is_active' => ['boolean'],
-            'system_role' => ['required', Rule::enum(SystemRole::class)],
+            'system_role' => ['nullable', Rule::enum(SystemRole::class)],
             'location_id' => ['nullable', 'exists:locations,id'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'business_role_ids' => ['nullable', 'array'],

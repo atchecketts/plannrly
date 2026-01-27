@@ -13,6 +13,25 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="h-full bg-gray-950 text-white">
+    @if(session('impersonator_id'))
+        <div class="bg-amber-500 text-black px-4 py-2">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span class="font-medium">You are impersonating {{ auth()->user()->full_name }}</span>
+                    <span class="text-amber-800 text-sm">(logged in as {{ session('impersonator_name') }})</span>
+                </div>
+                <form method="POST" action="{{ route('impersonate.stop') }}">
+                    @csrf
+                    <button type="submit" class="bg-black text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+                        Stop Impersonating
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endif
     <div class="min-h-full flex">
         <!-- Sidebar -->
         <aside class="hidden lg:flex lg:flex-col lg:w-64 bg-gray-900 border-r border-gray-800">
@@ -27,6 +46,30 @@
                     </svg>
                     <span class="font-medium">Dashboard</span>
                 </a>
+
+                @if(auth()->user()->isSuperAdmin())
+                    <div class="pt-4 mt-4 border-t border-gray-800">
+                        <p class="px-3 text-xs font-semibold text-amber-500 uppercase tracking-wider">Super Admin</p>
+                    </div>
+
+                    <a href="{{ route('super-admin.tenants.index') }}" class="{{ request()->routeIs('super-admin.tenants.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span>Tenants</span>
+                    </a>
+
+                    <a href="{{ route('super-admin.users.index') }}" class="{{ request()->routeIs('super-admin.users.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span>All Users</span>
+                    </a>
+
+                    <div class="pt-4 mt-4 border-t border-gray-800">
+                        <p class="px-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Tenant</p>
+                    </div>
+                @endif
 
                 <a href="{{ route('schedule.index') }}" class="{{ request()->routeIs('schedule.*') ? 'flex items-center gap-3 px-3 py-2.5 text-white bg-brand-900/50 border border-brand-700/50 rounded-lg' : 'flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

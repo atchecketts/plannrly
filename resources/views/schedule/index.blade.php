@@ -22,6 +22,43 @@
         $numDays = count($weekDates);
         $defaultColors = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#14b8a6', '#f43f5e', '#f97316', '#3b82f6', '#ec4899'];
         $colorIndex = 0;
+
+        // Helper to check if a shift is editable by the current user
+        $isShiftEditable = function($shift) use ($canEditShifts, $editableLocationIds, $editableDepartmentIds) {
+            if (!$canEditShifts) {
+                return false;
+            }
+            // null means admin - can edit all
+            if ($editableLocationIds === null) {
+                return true;
+            }
+            // Location admin can edit shifts in their locations
+            if (in_array($shift->location_id, $editableLocationIds)) {
+                return true;
+            }
+            // Department admin can edit shifts in their departments
+            if (in_array($shift->department_id, $editableDepartmentIds)) {
+                return true;
+            }
+            return false;
+        };
+
+        // Helper to check if user can create shifts for a department
+        $canCreateInDepartment = function($departmentId, $locationId) use ($canEditShifts, $editableLocationIds, $editableDepartmentIds) {
+            if (!$canEditShifts) {
+                return false;
+            }
+            if ($editableLocationIds === null) {
+                return true;
+            }
+            if (in_array($locationId, $editableLocationIds)) {
+                return true;
+            }
+            if (in_array($departmentId, $editableDepartmentIds)) {
+                return true;
+            }
+            return false;
+        };
     @endphp
 
     <div x-data="scheduleApp()" x-init="init()"
@@ -42,7 +79,19 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                             </svg>
                         </a>
+                        @php
+                            $singleLocation = $locations->count() === 1;
+                            $singleDepartment = $departments->count() === 1;
+                            $singleRole = $businessRoles->count() === 1;
+                        @endphp
                         <div>
+                            @if($singleLocation || $singleDepartment)
+                                <p class="text-xs text-gray-500 mb-0.5">
+                                    @if($singleLocation){{ $locations->first()->name }}@endif
+                                    @if($singleLocation && $singleDepartment) › @endif
+                                    @if($singleDepartment){{ $departments->first()->name }}@endif
+                                </p>
+                            @endif
                             <h1 class="text-xl font-bold text-white">{{ $startDate->format('M d') }} - {{ $endDate->format('M d, Y') }}</h1>
                             <p class="text-sm text-gray-500">Week {{ $startDate->weekOfYear }}</p>
                         </div>
@@ -90,34 +139,65 @@
                 </div>
 
                 <!-- Filters -->
+                <!-- Hidden inputs for single-option filters (for JavaScript compatibility) -->
+                @if($singleLocation)
+                    <input type="hidden" id="filter-location" value="{{ $locations->first()->id }}">
+                @endif
+                @if($singleDepartment)
+                    <input type="hidden" id="filter-department" value="{{ $departments->first()->id }}">
+                @endif
+                @if($singleRole)
+                    <input type="hidden" id="filter-role" value="{{ $businessRoles->first()->id }}">
+                @endif
+
                 <div class="flex items-center gap-4 mt-4">
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Location:</label>
-                        <select id="filter-location" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">Select Location</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}" data-location-id="{{ $location->id }}">{{ $location->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Department:</label>
-                        <select id="filter-department" disabled class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">Select Location First</option>
-                            @foreach($departments as $department)
-                                <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Role:</label>
-                        <select id="filter-role" disabled class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">Select Department First</option>
-                            @foreach($businessRoles as $role)
-                                <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if(!$singleLocation)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Location:</label>
+                            <select id="filter-location" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                <option value="">All Locations</option>
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}" data-location-id="{{ $location->id }}">{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    @if(!$singleDepartment)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Department:</label>
+                            <select id="filter-department" {{ $singleLocation ? '' : 'disabled' }} class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                @if($singleLocation)
+                                    <option value="">All Departments</option>
+                                    @foreach($departments as $department)
+                                        <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="">Select Location First</option>
+                                    @foreach($departments as $department)
+                                        <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+                    @endif
+                    @if(!$singleRole)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Role:</label>
+                            <select id="filter-role" {{ $singleDepartment ? '' : 'disabled' }} class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                @if($singleDepartment)
+                                    <option value="">All Roles</option>
+                                    @foreach($businessRoles as $role)
+                                        <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="">Select Department First</option>
+                                    @foreach($businessRoles as $role)
+                                        <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+                    @endif
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium text-gray-500">Group By:</label>
                         <select id="filter-group-by" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
@@ -183,22 +263,25 @@
                                 $isToday = $date->isToday();
                             @endphp
 
-                            <div class="p-2 border-r border-amber-700/30 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell cursor-pointer hover:bg-gray-800 transition-colors"
+                            <div class="p-2 border-r border-amber-700/30 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell {{ $canEditShifts ? 'cursor-pointer hover:bg-gray-800' : '' }} transition-colors"
                                  data-user-id=""
                                  data-date="{{ $dateStr }}"
                                  data-location-id="{{ $locations->first()?->id }}"
                                  data-department-id="{{ $departments->first()?->id }}"
+                                 @if($canEditShifts)
                                  @dragover.prevent
                                  @dragenter="handleDragEnter($event)"
                                  @dragleave="handleDragLeave($event)"
                                  @drop="handleDrop($event, null, '{{ $dateStr }}')"
-                                 title="Click to add unassigned shift">
+                                 title="Click to add unassigned shift"
+                                 @endif>
 
                                 @if(count($unassignedForDate) > 0)
                                     <div class="space-y-1">
                                         @foreach($unassignedForDate as $shift)
+                                            @php $shiftEditable = $isShiftEditable($shift); @endphp
                                             <!-- Unassigned Shift Block -->
-                                            <div class="shift-block unassigned-shift text-white rounded-lg p-2 text-xs cursor-move transition-colors hover:brightness-110 border border-amber-500/30 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                            <div class="shift-block unassigned-shift text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} transition-colors hover:brightness-110 border border-amber-500/30 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                  style="background-color: {{ $shift->businessRole?->color ?? '#f59e0b' }};"
                                                  data-shift-id="{{ $shift->id }}"
                                                  data-user-id=""
@@ -209,10 +292,12 @@
                                                  data-location-id="{{ $shift->location_id }}"
                                                  data-department-id="{{ $shift->department_id }}"
                                                  data-role-id="{{ $shift->business_role_id }}"
+                                                 @if($shiftEditable)
                                                  draggable="true"
                                                  @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                  @dragend="handleDragEnd($event)"
-                                                 @click.stop="editModal.open({{ $shift->id }})">
+                                                 @click.stop="editModal.open({{ $shift->id }})"
+                                                 @endif>
                                                 @if($shift->isDraft())
                                                     <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                 @endif
@@ -224,7 +309,7 @@
                                             </div>
                                         @endforeach
                                     </div>
-                                @else
+                                @elseif($canEditShifts)
                                     <!-- Empty Cell - Add Unassigned Shift Placeholder -->
                                     <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-amber-700/50 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 hover:bg-amber-500/10 transition-colors"
                                          @click.stop="editModal.create(null, '{{ $dateStr }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})">
@@ -292,16 +377,19 @@
                                             $isToday = $date->isToday();
                                         @endphp
 
-                                        <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell cursor-pointer hover:bg-gray-800 transition-colors"
+                                        @php $cellEditable = $canCreateInDepartment($department->id, $department->location_id); @endphp
+                                        <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800' : '' }} transition-colors"
                                              data-user-id="{{ $user->id }}"
                                              data-date="{{ $dateStr }}"
                                              data-location-id="{{ $department->location_id }}"
                                              data-department-id="{{ $department->id }}"
+                                             @if($cellEditable)
                                              @dragover.prevent
                                              @dragenter="handleDragEnter($event)"
                                              @dragleave="handleDragLeave($event)"
                                              @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')"
-                                             title="Click to add shift">
+                                             title="Click to add shift"
+                                             @endif>
 
                                             @if($leave)
                                                 <!-- Leave Block -->
@@ -311,8 +399,9 @@
                                             @elseif(count($userShifts) > 0)
                                                 <div class="space-y-1">
                                                     @foreach($userShifts as $shift)
+                                                        @php $shiftEditable = $isShiftEditable($shift); @endphp
                                                         <!-- Shift Block -->
-                                                        <div class="shift-block text-white rounded-lg p-2 text-xs cursor-move transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                        <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                              style="background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                              data-shift-id="{{ $shift->id }}"
                                                              data-user-id="{{ $user->id }}"
@@ -320,10 +409,12 @@
                                                              data-status="{{ $shift->status->value }}"
                                                              data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                              data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                             @if($shiftEditable)
                                                              draggable="true"
                                                              @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                              @dragend="handleDragEnd($event)"
-                                                             @click.stop="editModal.open({{ $shift->id }})">
+                                                             @click.stop="editModal.open({{ $shift->id }})"
+                                                             @endif>
                                                             @if($shift->isDraft())
                                                                 <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                             @endif
@@ -334,6 +425,7 @@
                                                             <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                                         </div>
                                                     @endforeach
+                                                    @if($cellEditable)
                                                     <!-- Add Another Shift Button -->
                                                     <div class="add-shift-btn h-6 border border-dashed border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                          @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $department->location_id }}, {{ $department->id }})">
@@ -341,8 +433,9 @@
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                         </svg>
                                                     </div>
+                                                    @endif
                                                 </div>
-                                            @else
+                                            @elseif($cellEditable)
                                                 <!-- Empty Cell - Add Shift Placeholder -->
                                                 <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                      @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $department->location_id }}, {{ $department->id }})">
@@ -419,16 +512,19 @@
                                             $isToday = $date->isToday();
                                         @endphp
 
-                                        <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell cursor-pointer hover:bg-gray-800 transition-colors"
+                                        @php $cellEditable = $canCreateInDepartment($userDepartment?->id, $userDepartment?->location_id); @endphp
+                                        <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800' : '' }} transition-colors"
                                              data-user-id="{{ $user->id }}"
                                              data-date="{{ $dateStr }}"
                                              data-location-id="{{ $userDepartment?->location_id }}"
                                              data-department-id="{{ $userDepartment?->id }}"
+                                             @if($cellEditable)
                                              @dragover.prevent
                                              @dragenter="handleDragEnter($event)"
                                              @dragleave="handleDragLeave($event)"
                                              @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')"
-                                             title="Click to add shift">
+                                             title="Click to add shift"
+                                             @endif>
 
                                             @if($leave)
                                                 <!-- Leave Block -->
@@ -438,8 +534,9 @@
                                             @elseif(count($userShifts) > 0)
                                                 <div class="space-y-1">
                                                     @foreach($userShifts as $shift)
+                                                        @php $shiftEditable = $isShiftEditable($shift); @endphp
                                                         <!-- Shift Block -->
-                                                        <div class="shift-block text-white rounded-lg p-2 text-xs cursor-move transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                        <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                              style="background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                              data-shift-id="{{ $shift->id }}"
                                                              data-user-id="{{ $user->id }}"
@@ -447,10 +544,12 @@
                                                              data-status="{{ $shift->status->value }}"
                                                              data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                              data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                             @if($shiftEditable)
                                                              draggable="true"
                                                              @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                              @dragend="handleDragEnd($event)"
-                                                             @click.stop="editModal.open({{ $shift->id }})">
+                                                             @click.stop="editModal.open({{ $shift->id }})"
+                                                             @endif>
                                                             @if($shift->isDraft())
                                                                 <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                             @endif
@@ -461,6 +560,7 @@
                                                             <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                                         </div>
                                                     @endforeach
+                                                    @if($cellEditable)
                                                     <!-- Add Another Shift Button -->
                                                     <div class="add-shift-btn h-6 border border-dashed border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                          @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
@@ -468,8 +568,9 @@
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                         </svg>
                                                     </div>
+                                                    @endif
                                                 </div>
-                                            @else
+                                            @elseif($cellEditable)
                                                 <!-- Empty Cell - Add Shift Placeholder -->
                                                 <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                      @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
@@ -515,21 +616,25 @@
                                         $userShifts = $shiftsLookup[$user->id][$dateStr] ?? [];
                                         $isWeekend = $date->isWeekend();
                                         $isToday = $date->isToday();
+                                        $cellEditable = $canCreateInDepartment($departments->first()?->id, $locations->first()?->id);
                                     @endphp
 
-                                    <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell cursor-pointer hover:bg-gray-800 transition-colors"
+                                    <div class="p-2 border-r border-gray-800 {{ $isWeekend ? 'bg-gray-800/30' : '' }} {{ $isToday ? 'bg-brand-900/10' : '' }} schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800' : '' }} transition-colors"
                                          data-user-id="{{ $user->id }}"
                                          data-date="{{ $dateStr }}"
                                          data-location-id="{{ $locations->first()?->id }}"
                                          data-department-id="{{ $departments->first()?->id }}"
+                                         @if($cellEditable)
                                          @dragover.prevent
                                          @dragenter="handleDragEnter($event)"
                                          @dragleave="handleDragLeave($event)"
-                                         @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')">
+                                         @drop="handleDrop($event, {{ $user->id }}, '{{ $dateStr }}')"
+                                         @endif>
                                         @if(count($userShifts) > 0)
                                             <div class="space-y-1">
                                                 @foreach($userShifts as $shift)
-                                                    <div class="shift-block text-white rounded-lg p-2 text-xs cursor-move hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                    @php $shiftEditable = $isShiftEditable($shift); @endphp
+                                                    <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                          style="background-color: {{ $shift->businessRole?->color ?? '#4b5563' }};"
                                                          data-shift-id="{{ $shift->id }}"
                                                          data-user-id="{{ $user->id }}"
@@ -537,10 +642,12 @@
                                                          data-status="{{ $shift->status->value }}"
                                                          data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                          data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                         @if($shiftEditable)
                                                          draggable="true"
                                                          @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                          @dragend="handleDragEnd($event)"
-                                                         @click.stop="editModal.open({{ $shift->id }})">
+                                                         @click.stop="editModal.open({{ $shift->id }})"
+                                                         @endif>
                                                         @if($shift->isDraft())
                                                             <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                         @endif
@@ -551,6 +658,7 @@
                                                         <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                                     </div>
                                                 @endforeach
+                                                @if($cellEditable)
                                                 <!-- Add Another Shift Button -->
                                                 <div class="add-shift-btn h-6 border border-dashed border-gray-700 rounded flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                      @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})">
@@ -558,8 +666,9 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                     </svg>
                                                 </div>
+                                                @endif
                                             </div>
-                                        @else
+                                        @elseif($cellEditable)
                                             <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                                                  @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})">
                                                 <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -703,6 +812,73 @@
                 </div>
             </div>
         </div>
+
+        <!-- Confirmation Modal -->
+        <div x-show="confirmModal.isOpen"
+             x-cloak
+             class="fixed inset-0 z-50 overflow-y-auto"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+            <!-- Backdrop -->
+            <div class="fixed inset-0 bg-black/60" @click="handleCancel()"></div>
+
+            <!-- Modal -->
+            <div class="flex min-h-full items-center justify-center p-6">
+                <div x-show="confirmModal.isOpen"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     @click.stop
+                     class="relative w-96 bg-gray-900 rounded-xl border border-amber-500/50 shadow-xl">
+
+                    <!-- Header -->
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-amber-500/30">
+                        <!-- Warning Icon -->
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <!-- Title -->
+                        <div class="flex-1">
+                            <h3 class="text-base font-semibold text-amber-400" x-text="confirmModal.title"></h3>
+                        </div>
+                        <!-- Close Button -->
+                        <button @click="handleCancel()" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="px-6 py-4">
+                        <p class="text-sm text-gray-300" x-text="confirmModal.message"></p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="px-6 py-3 border-t border-gray-800 flex justify-end gap-3">
+                        <button @click="handleCancel()"
+                                class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
+                            Cancel
+                        </button>
+                        <button @click="handleConfirm()"
+                                class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors">
+                            Move Anyway
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -744,6 +920,11 @@
                 startDate: '{{ $startDate->format('Y-m-d') }}',
                 endDate: '{{ $endDate->format('Y-m-d') }}',
 
+                // Permissions
+                canEditShifts: {{ $canEditShifts ? 'true' : 'false' }},
+                editableLocationIds: {!! $editableLocationIds === null ? 'null' : json_encode($editableLocationIds) !!},
+                editableDepartmentIds: {!! $editableDepartmentIds === null ? 'null' : json_encode($editableDepartmentIds) !!},
+
                 // Stats
                 stats: {
                     totalShifts: {{ $totalShifts }},
@@ -757,6 +938,15 @@
                     type: 'info',
                     title: '',
                     message: ''
+                },
+
+                // Confirmation modal state
+                confirmModal: {
+                    isOpen: false,
+                    title: '',
+                    message: '',
+                    onConfirm: null,
+                    onCancel: null
                 },
 
                 showNotification(type, title, message) {
@@ -776,6 +966,41 @@
 
                 closeNotification() {
                     this.notification.isOpen = false;
+                },
+
+                showConfirm(title, message, onConfirm, onCancel = null) {
+                    this.confirmModal.title = title;
+                    this.confirmModal.message = message;
+                    this.confirmModal.onConfirm = onConfirm;
+                    this.confirmModal.onCancel = onCancel;
+                    this.confirmModal.isOpen = true;
+                },
+
+                handleConfirm() {
+                    if (this.confirmModal.onConfirm) {
+                        this.confirmModal.onConfirm();
+                    }
+                    this.confirmModal.isOpen = false;
+                    this.confirmModal.onConfirm = null;
+                    this.confirmModal.onCancel = null;
+                },
+
+                handleCancel() {
+                    if (this.confirmModal.onCancel) {
+                        this.confirmModal.onCancel();
+                    }
+                    this.confirmModal.isOpen = false;
+                    this.confirmModal.onConfirm = null;
+                    this.confirmModal.onCancel = null;
+                },
+
+                // Check if a shift is editable by current user
+                isShiftEditable(shift) {
+                    if (!this.canEditShifts) return false;
+                    if (this.editableLocationIds === null) return true; // Admin
+                    if (this.editableLocationIds.includes(shift.location_id)) return true;
+                    if (this.editableDepartmentIds.includes(shift.department_id)) return true;
+                    return false;
                 },
 
                 // Publish all draft shifts
@@ -1454,9 +1679,12 @@
                         // Get role color or default (amber for unassigned)
                         const roleColor = shift.business_role?.color || (isUnassigned ? '#f59e0b' : '#6366f1');
 
+                        // Check if this shift is editable
+                        const shiftEditable = this.isShiftEditable(shift);
+
                         // Create shift block
                         const shiftBlock = document.createElement('div');
-                        shiftBlock.className = 'shift-block text-white rounded-lg p-2 text-xs cursor-move transition-colors hover:brightness-110';
+                        shiftBlock.className = `shift-block text-white rounded-lg p-2 text-xs ${shiftEditable ? 'cursor-move' : 'cursor-default'} transition-colors hover:brightness-110`;
                         if (isUnassigned) {
                             shiftBlock.classList.add('border', 'border-amber-500/30');
                         }
@@ -1470,7 +1698,7 @@
                         shiftBlock.dataset.status = shift.status;
                         shiftBlock.dataset.startTime = shift.start_time.substring(0, 5);
                         shiftBlock.dataset.endTime = shift.end_time.substring(0, 5);
-                        shiftBlock.draggable = true;
+                        shiftBlock.draggable = shiftEditable;
 
                         const draftLabel = isDraft ? '<div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>' : '';
                         shiftBlock.innerHTML = `
@@ -1490,17 +1718,19 @@
                             detail: { shifts: 1, hours: shiftHours, unassigned: isUnassigned ? 1 : 0 }
                         }));
 
-                        // Add event listeners
-                        shiftBlock.addEventListener('dragstart', (e) => {
-                            window.Alpine.evaluate(document.querySelector('[x-data]'), `handleDragStart($event, ${shift.id})`);
-                        });
-                        shiftBlock.addEventListener('dragend', (e) => {
-                            window.Alpine.evaluate(document.querySelector('[x-data]'), 'handleDragEnd($event)');
-                        });
-                        shiftBlock.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            window.Alpine.evaluate(document.querySelector('[x-data]'), `editModal.open(${shift.id})`);
-                        });
+                        // Add event listeners only if editable
+                        if (shiftEditable) {
+                            shiftBlock.addEventListener('dragstart', (e) => {
+                                window.Alpine.evaluate(document.querySelector('[x-data]'), `handleDragStart($event, ${shift.id})`);
+                            });
+                            shiftBlock.addEventListener('dragend', (e) => {
+                                window.Alpine.evaluate(document.querySelector('[x-data]'), 'handleDragEnd($event)');
+                            });
+                            shiftBlock.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                window.Alpine.evaluate(document.querySelector('[x-data]'), `editModal.open(${shift.id})`);
+                            });
+                        }
 
                         if (isUnassigned) {
                             // For unassigned row, use space-y-1 container
@@ -1584,6 +1814,12 @@
                     const originalCell = originalElement.closest('.schedule-cell');
                     const originalUserId = originalElement.dataset.userId || null;
                     const originalDate = originalElement.dataset.date;
+                    const shiftStatus = originalElement.dataset.status;
+
+                    // Clear drag state immediately to prevent issues with modal interactions
+                    this.draggedShiftId = null;
+                    this.draggedElement = null;
+                    originalElement.classList.remove('dragging');
 
                     // Normalize userId comparison (handle empty string as null)
                     const normalizedOriginalUserId = originalUserId === '' ? null : originalUserId;
@@ -1594,6 +1830,11 @@
                         return;
                     }
 
+                    // Proceed with move - clash check happens server-side, published warning shown after success
+                    await this.executeDropMove(shiftId, originalElement, originalCell, normalizedOriginalUserId, normalizedTargetUserId, originalDate, date, cell, shiftStatus);
+                },
+
+                async executeDropMove(shiftId, originalElement, originalCell, normalizedOriginalUserId, normalizedTargetUserId, originalDate, date, cell, shiftStatus) {
                     // Check if target is unassigned row
                     const isTargetUnassigned = normalizedTargetUserId === null;
 
@@ -1706,6 +1947,16 @@
 
                         // Update unassigned count in header
                         this.updateUnassignedCount();
+
+                        // Show warning if shift was published
+                        if (shiftStatus === 'published') {
+                            this.showConfirm(
+                                'Shift Moved',
+                                'This shift is already published. If you move it you will need to publish it again.',
+                                () => {},
+                                null
+                            );
+                        }
 
                     } catch (error) {
                         console.error('Failed to move shift:', error);

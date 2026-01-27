@@ -23,12 +23,95 @@
         .hour-column:first-child {
             border-left: none;
         }
+        /* Resize handles */
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: ew-resize;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 10;
+        }
+        .resize-handle-left {
+            left: 0;
+            border-radius: 8px 0 0 8px;
+        }
+        .resize-handle-right {
+            right: 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .shift-bar:hover .resize-handle {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .resize-handle:hover {
+            background: rgba(255, 255, 255, 0.5) !important;
+        }
+        /* Time preview tooltip */
+        .time-preview {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+        /* Prevent text selection during drag */
+        .dragging-active {
+            user-select: none;
+        }
+        .dragging-active * {
+            user-select: none;
+        }
     </style>
 
     @php
         $numHours = count($hours);
         $defaultColors = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#14b8a6', '#f43f5e', '#f97316', '#3b82f6', '#ec4899'];
         $colorIndex = 0;
+
+        // Helper to check if a shift is editable by the current user
+        $isShiftEditable = function($shift) use ($canEditShifts, $editableLocationIds, $editableDepartmentIds) {
+            if (!$canEditShifts) {
+                return false;
+            }
+            // null means admin - can edit all
+            if ($editableLocationIds === null) {
+                return true;
+            }
+            // Location admin can edit shifts in their locations
+            if (in_array($shift->location_id, $editableLocationIds)) {
+                return true;
+            }
+            // Department admin can edit shifts in their departments
+            if (in_array($shift->department_id, $editableDepartmentIds)) {
+                return true;
+            }
+            return false;
+        };
+
+        // Helper to check if user can create shifts for a department
+        $canCreateInDepartment = function($departmentId, $locationId) use ($canEditShifts, $editableLocationIds, $editableDepartmentIds) {
+            if (!$canEditShifts) {
+                return false;
+            }
+            if ($editableLocationIds === null) {
+                return true;
+            }
+            if (in_array($locationId, $editableLocationIds)) {
+                return true;
+            }
+            if (in_array($departmentId, $editableDepartmentIds)) {
+                return true;
+            }
+            return false;
+        };
     @endphp
 
     <div x-data="scheduleDayApp()" x-init="init()">
@@ -44,7 +127,19 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                             </svg>
                         </a>
+                        @php
+                            $singleLocation = $locations->count() === 1;
+                            $singleDepartment = $departments->count() === 1;
+                            $singleRole = $businessRoles->count() === 1;
+                        @endphp
                         <div>
+                            @if($singleLocation || $singleDepartment)
+                                <p class="text-xs text-gray-500 mb-0.5">
+                                    @if($singleLocation){{ $locations->first()->name }}@endif
+                                    @if($singleLocation && $singleDepartment) › @endif
+                                    @if($singleDepartment){{ $departments->first()->name }}@endif
+                                </p>
+                            @endif
                             <h1 class="text-xl font-bold text-white">{{ $selectedDate->format('l, F j, Y') }}</h1>
                             <p class="text-sm text-gray-500">{{ $selectedDate->isToday() ? 'Today' : $selectedDate->diffForHumans() }}</p>
                         </div>
@@ -94,34 +189,65 @@
                 </div>
 
                 <!-- Filters Row -->
+                <!-- Hidden inputs for single-option filters (for JavaScript compatibility) -->
+                @if($singleLocation)
+                    <input type="hidden" id="filter-location" value="{{ $locations->first()->id }}">
+                @endif
+                @if($singleDepartment)
+                    <input type="hidden" id="filter-department" value="{{ $departments->first()->id }}">
+                @endif
+                @if($singleRole)
+                    <input type="hidden" id="filter-role" value="{{ $businessRoles->first()->id }}">
+                @endif
+
                 <div class="flex items-center gap-4 mt-4">
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Location:</label>
-                        <select id="filter-location" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">All Locations</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}">{{ $location->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Department:</label>
-                        <select id="filter-department" disabled class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">Select Location First</option>
-                            @foreach($departments as $department)
-                                <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-500">Role:</label>
-                        <select id="filter-role" disabled class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
-                            <option value="">Select Department First</option>
-                            @foreach($businessRoles as $role)
-                                <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if(!$singleLocation)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Location:</label>
+                            <select id="filter-location" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                <option value="">All Locations</option>
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    @if(!$singleDepartment)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Department:</label>
+                            <select id="filter-department" {{ $singleLocation ? '' : 'disabled' }} class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                @if($singleLocation)
+                                    <option value="">All Departments</option>
+                                    @foreach($departments as $department)
+                                        <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="">Select Location First</option>
+                                    @foreach($departments as $department)
+                                        <option value="{{ $department->id }}" data-location-id="{{ $department->location_id }}">{{ $department->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+                    @endif
+                    @if(!$singleRole)
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-500">Role:</label>
+                            <select id="filter-role" {{ $singleDepartment ? '' : 'disabled' }} class="filter-select text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
+                                @if($singleDepartment)
+                                    <option value="">All Roles</option>
+                                    @foreach($businessRoles as $role)
+                                        <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="">Select Department First</option>
+                                    @foreach($businessRoles as $role)
+                                        <option value="{{ $role->id }}" data-department-id="{{ $role->department_id }}">{{ $role->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+                    @endif
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium text-gray-500">Group By:</label>
                         <select id="filter-group-by" class="text-sm bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-brand-500 focus:border-brand-500 px-3 py-1.5">
@@ -177,7 +303,9 @@
                             </div>
 
                             <!-- Timeline Area -->
-                            <div class="relative h-16 bg-gray-800/20">
+                            <div class="relative h-16 bg-gray-800/20 schedule-cell"
+                                 data-user-id=""
+                                 data-date="{{ $selectedDate->format('Y-m-d') }}">
                                 @foreach($unassignedShifts as $shift)
                                     @php
                                         $startHour = $shift->start_time->hour + ($shift->start_time->minute / 60);
@@ -187,24 +315,36 @@
                                         $widthPercent = (($endHour - $startHour) / $numHours) * 100;
                                         $leftPercent = max(0, min(100, $leftPercent));
                                         $widthPercent = max(0, min(100 - $leftPercent, $widthPercent));
+                                        $shiftEditable = $isShiftEditable($shift);
                                     @endphp
-                                    <div class="shift-bar unassigned-shift absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white cursor-pointer hover:brightness-110 transition-colors border border-amber-500/30 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                    <div class="shift-bar unassigned-shift absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white {{ $shiftEditable ? 'cursor-pointer' : 'cursor-default' }} hover:brightness-110 transition-colors border border-amber-500/30 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                          style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; background-color: {{ $shift->businessRole?->color ?? '#f59e0b' }};"
                                          data-shift-id="{{ $shift->id }}"
                                          data-location-id="{{ $shift->location_id }}"
                                          data-department-id="{{ $shift->department_id }}"
                                          data-role-id="{{ $shift->business_role_id }}"
-                                         @click="editModal.open({{ $shift->id }})">
-                                        <div class="flex items-center justify-between h-full">
-                                            <div class="truncate">
+                                         data-start-time="{{ $shift->start_time->format('H:i') }}"
+                                         data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                         data-user-id="{{ $shift->user_id }}"
+                                         data-status="{{ $shift->status->value }}"
+                                         @if($shiftEditable)
+                                         @mousedown="startDrag($event, {{ $shift->id }})"
+                                         @click.stop="if (!dragState.active) editModal.open({{ $shift->id }})"
+                                         @endif>
+                                        @if($shiftEditable)
+                                        <div class="resize-handle resize-handle-left" @mousedown.stop="startResize($event, {{ $shift->id }}, 'left')"></div>
+                                        <div class="resize-handle resize-handle-right" @mousedown.stop="startResize($event, {{ $shift->id }}, 'right')"></div>
+                                        @endif
+                                        <div class="flex items-center justify-between h-full pointer-events-none">
+                                            <div class="flex items-center gap-2 truncate">
                                                 @if($shift->isDraft())
-                                                    <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mr-1">Draft</span>
+                                                    <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Draft</span>
                                                 @endif
-                                                <span class="font-medium">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                <span class="font-medium shift-time-display">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                <span class="text-white/70 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</span>
                                             </div>
-                                            <span class="text-white/60 ml-2">{{ $shift->duration_hours }} hrs</span>
+                                            <span class="text-white/60 ml-2 shrink-0 shift-hours-display">{{ $shift->duration_hours }} hrs</span>
                                         </div>
-                                        <div class="truncate text-white/80 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                     </div>
                                 @endforeach
                             </div>
@@ -259,12 +399,15 @@
                                     </div>
 
                                     <!-- Timeline Area -->
-                                    <div class="relative h-16 schedule-cell cursor-pointer hover:bg-gray-800/30 transition-colors"
+                                    @php $cellEditable = $canCreateInDepartment($department->id, $department->location_id); @endphp
+                                    <div class="relative h-16 schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800/30' : '' }} transition-colors"
                                          data-user-id="{{ $user->id }}"
                                          data-date="{{ $selectedDate->format('Y-m-d') }}"
                                          data-location-id="{{ $department->location_id }}"
                                          data-department-id="{{ $department->id }}"
-                                         @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $department->location_id }}, {{ $department->id }})">
+                                         @if($cellEditable)
+                                         @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $department->location_id }}, {{ $department->id }})"
+                                         @endif>
 
                                         <!-- Hour grid lines -->
                                         <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: repeat({{ $numHours }}, 1fr);">
@@ -288,25 +431,37 @@
                                                     $widthPercent = (($endHour - $startHour) / $numHours) * 100;
                                                     $leftPercent = max(0, min(100, $leftPercent));
                                                     $widthPercent = max(0, min(100 - $leftPercent, $widthPercent));
+                                                    $shiftEditable = $isShiftEditable($shift);
                                                 @endphp
-                                                <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white cursor-pointer hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white {{ $shiftEditable ? 'cursor-pointer' : 'cursor-default' }} hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                      style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                      data-shift-id="{{ $shift->id }}"
-                                                     @click.stop="editModal.open({{ $shift->id }})">
-                                                    <div class="flex items-center justify-between h-full">
-                                                        <div class="truncate">
+                                                     data-start-time="{{ $shift->start_time->format('H:i') }}"
+                                                     data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                     data-user-id="{{ $shift->user_id }}"
+                                                     data-status="{{ $shift->status->value }}"
+                                                     @if($shiftEditable)
+                                                     @mousedown="startDrag($event, {{ $shift->id }})"
+                                                     @click.stop="if (!dragState.active) editModal.open({{ $shift->id }})"
+                                                     @endif>
+                                                    @if($shiftEditable)
+                                                    <div class="resize-handle resize-handle-left" @mousedown.stop="startResize($event, {{ $shift->id }}, 'left')"></div>
+                                                    <div class="resize-handle resize-handle-right" @mousedown.stop="startResize($event, {{ $shift->id }}, 'right')"></div>
+                                                    @endif
+                                                    <div class="flex items-center justify-between h-full pointer-events-none">
+                                                        <div class="flex items-center gap-2 truncate">
                                                             @if($shift->isDraft())
-                                                                <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mr-1">Draft</span>
+                                                                <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Draft</span>
                                                             @endif
-                                                            <span class="font-medium">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                            <span class="font-medium shift-time-display">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                            <span class="text-white/70 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</span>
                                                         </div>
-                                                        <span class="text-white/60 ml-2">{{ $shift->duration_hours }} hrs</span>
+                                                        <span class="text-white/60 ml-2 shrink-0 shift-hours-display">{{ $shift->duration_hours }} hrs</span>
                                                     </div>
-                                                    <div class="truncate text-white/80 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                                 </div>
                                             @endforeach
 
-                                            @if(count($userShifts) === 0)
+                                            @if(count($userShifts) === 0 && $cellEditable)
                                                 <!-- Empty state - show add button on hover -->
                                                 <div class="add-shift-btn absolute inset-2 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-500/10 transition-colors">
                                                     <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,12 +530,19 @@
                                     </div>
 
                                     <!-- Timeline Area -->
-                                    <div class="relative h-16 schedule-cell cursor-pointer hover:bg-gray-800/30 transition-colors"
+                                    @php $cellEditable = $canCreateInDepartment($userDepartment?->id, $userDepartment?->location_id); @endphp
+                                    <div class="relative h-16 schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800/30' : '' }} transition-colors"
                                          data-user-id="{{ $user->id }}"
                                          data-date="{{ $selectedDate->format('Y-m-d') }}"
                                          data-location-id="{{ $userDepartment?->location_id }}"
                                          data-department-id="{{ $userDepartment?->id }}"
-                                         @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
+                                         @if($cellEditable)
+                                         @dragover.prevent
+                                         @dragenter="handleDragEnter($event)"
+                                         @dragleave="handleDragLeave($event)"
+                                         @drop="handleDrop($event, {{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}')"
+                                         @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})"
+                                         @endif>
 
                                         <!-- Hour grid lines -->
                                         <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: repeat({{ $numHours }}, 1fr);">
@@ -404,25 +566,37 @@
                                                     $widthPercent = (($endHour - $startHour) / $numHours) * 100;
                                                     $leftPercent = max(0, min(100, $leftPercent));
                                                     $widthPercent = max(0, min(100 - $leftPercent, $widthPercent));
+                                                    $shiftEditable = $isShiftEditable($shift);
                                                 @endphp
-                                                <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white cursor-pointer hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white {{ $shiftEditable ? 'cursor-pointer' : 'cursor-default' }} hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                      style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                      data-shift-id="{{ $shift->id }}"
-                                                     @click.stop="editModal.open({{ $shift->id }})">
-                                                    <div class="flex items-center justify-between h-full">
-                                                        <div class="truncate">
+                                                     data-start-time="{{ $shift->start_time->format('H:i') }}"
+                                                     data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                     data-user-id="{{ $shift->user_id }}"
+                                                     data-status="{{ $shift->status->value }}"
+                                                     @if($shiftEditable)
+                                                     @mousedown="startDrag($event, {{ $shift->id }})"
+                                                     @click.stop="if (!dragState.active) editModal.open({{ $shift->id }})"
+                                                     @endif>
+                                                    @if($shiftEditable)
+                                                    <div class="resize-handle resize-handle-left" @mousedown.stop="startResize($event, {{ $shift->id }}, 'left')"></div>
+                                                    <div class="resize-handle resize-handle-right" @mousedown.stop="startResize($event, {{ $shift->id }}, 'right')"></div>
+                                                    @endif
+                                                    <div class="flex items-center justify-between h-full pointer-events-none">
+                                                        <div class="flex items-center gap-2 truncate">
                                                             @if($shift->isDraft())
-                                                                <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mr-1">Draft</span>
+                                                                <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Draft</span>
                                                             @endif
-                                                            <span class="font-medium">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                            <span class="font-medium shift-time-display">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                            <span class="text-white/70 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</span>
                                                         </div>
-                                                        <span class="text-white/60 ml-2">{{ $shift->duration_hours }} hrs</span>
+                                                        <span class="text-white/60 ml-2 shrink-0 shift-hours-display">{{ $shift->duration_hours }} hrs</span>
                                                     </div>
-                                                    <div class="truncate text-white/80 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                                 </div>
                                             @endforeach
 
-                                            @if(count($userShifts) === 0)
+                                            @if(count($userShifts) === 0 && $cellEditable)
                                                 <!-- Empty state - show add button on hover -->
                                                 <div class="add-shift-btn absolute inset-2 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-500/10 transition-colors">
                                                     <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -468,10 +642,17 @@
                                 </div>
 
                                 <!-- Timeline Area -->
-                                <div class="relative h-16 schedule-cell cursor-pointer hover:bg-gray-800/30 transition-colors"
+                                @php $cellEditable = $canCreateInDepartment($departments->first()?->id, $locations->first()?->id); @endphp
+                                <div class="relative h-16 schedule-cell {{ $cellEditable ? 'cursor-pointer hover:bg-gray-800/30' : '' }} transition-colors"
                                      data-user-id="{{ $user->id }}"
                                      data-date="{{ $selectedDate->format('Y-m-d') }}"
-                                     @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})">
+                                     @if($cellEditable)
+                                     @dragover.prevent
+                                     @dragenter="handleDragEnter($event)"
+                                     @dragleave="handleDragLeave($event)"
+                                     @drop="handleDrop($event, {{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}')"
+                                     @click.self="editModal.create({{ $user->id }}, '{{ $selectedDate->format('Y-m-d') }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})"
+                                     @endif>
 
                                     <!-- Hour grid lines -->
                                     <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: repeat({{ $numHours }}, 1fr);">
@@ -489,25 +670,37 @@
                                             $widthPercent = (($endHour - $startHour) / $numHours) * 100;
                                             $leftPercent = max(0, min(100, $leftPercent));
                                             $widthPercent = max(0, min(100 - $leftPercent, $widthPercent));
+                                            $shiftEditable = $isShiftEditable($shift);
                                         @endphp
-                                        <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white cursor-pointer hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                        <div class="shift-bar absolute top-2 bottom-2 rounded-lg p-2 text-xs text-white {{ $shiftEditable ? 'cursor-pointer' : 'cursor-default' }} hover:brightness-110 transition-colors {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                              style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; background-color: {{ $shift->businessRole?->color ?? '#4b5563' }};"
                                              data-shift-id="{{ $shift->id }}"
-                                             @click.stop="editModal.open({{ $shift->id }})">
-                                            <div class="flex items-center justify-between h-full">
-                                                <div class="truncate">
+                                             data-start-time="{{ $shift->start_time->format('H:i') }}"
+                                             data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                             data-user-id="{{ $shift->user_id }}"
+                                             data-status="{{ $shift->status->value }}"
+                                             @if($shiftEditable)
+                                             @mousedown="startDrag($event, {{ $shift->id }})"
+                                             @click.stop="if (!dragState.active) editModal.open({{ $shift->id }})"
+                                             @endif>
+                                            @if($shiftEditable)
+                                            <div class="resize-handle resize-handle-left" @mousedown.stop="startResize($event, {{ $shift->id }}, 'left')"></div>
+                                            <div class="resize-handle resize-handle-right" @mousedown.stop="startResize($event, {{ $shift->id }}, 'right')"></div>
+                                            @endif
+                                            <div class="flex items-center justify-between h-full pointer-events-none">
+                                                <div class="flex items-center gap-2 truncate">
                                                     @if($shift->isDraft())
-                                                        <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mr-1">Draft</span>
+                                                        <span class="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Draft</span>
                                                     @endif
-                                                    <span class="font-medium">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                    <span class="font-medium shift-time-display">{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                    <span class="text-white/70 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</span>
                                                 </div>
-                                                <span class="text-white/60 ml-2">{{ $shift->duration_hours }} hrs</span>
+                                                <span class="text-white/60 ml-2 shrink-0 shift-hours-display">{{ $shift->duration_hours }} hrs</span>
                                             </div>
-                                            <div class="truncate text-white/80 text-[10px]">{{ $shift->businessRole?->name ?? 'No role' }}</div>
                                         </div>
                                     @endforeach
 
-                                    @if(count($userShifts) === 0)
+                                    @if(count($userShifts) === 0 && $cellEditable)
                                         <div class="add-shift-btn absolute inset-2 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-500/10 transition-colors">
                                             <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -554,6 +747,140 @@
             :businessRoles="$businessRoles"
             :users="$users"
         />
+
+        <!-- Notification Modal -->
+        <div x-show="notification.isOpen"
+             x-cloak
+             class="fixed inset-0 z-50 overflow-y-auto"
+             @keydown.escape.window="closeNotification()">
+            <div class="fixed inset-0 bg-black/60" @click="closeNotification()"></div>
+
+            <div class="flex min-h-full items-center justify-center p-6">
+                <div x-show="notification.isOpen"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     @click.stop
+                     class="relative w-96 bg-gray-900 rounded-xl border shadow-xl"
+                     :class="notification.type === 'error' ? 'border-red-500/50' : notification.type === 'success' ? 'border-green-500/50' : 'border-gray-700'">
+
+                    <!-- Header -->
+                    <div class="flex items-center gap-3 px-6 py-4 border-b"
+                         :class="notification.type === 'error' ? 'border-red-500/30' : notification.type === 'success' ? 'border-green-500/30' : 'border-gray-700'">
+                        <!-- Icon -->
+                        <div class="flex-shrink-0">
+                            <template x-if="notification.type === 'error'">
+                                <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </template>
+                            <template x-if="notification.type === 'success'">
+                                <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            </template>
+                            <template x-if="notification.type === 'info'">
+                                <div class="w-10 h-10 rounded-full bg-brand-500/20 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Title -->
+                        <div class="flex-1">
+                            <h3 class="text-base font-semibold"
+                                :class="notification.type === 'error' ? 'text-red-400' : notification.type === 'success' ? 'text-green-400' : 'text-white'"
+                                x-text="notification.title"></h3>
+                        </div>
+                        <!-- Close Button -->
+                        <button @click="closeNotification()" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="px-6 py-4">
+                        <p class="text-sm text-gray-300" x-text="notification.message"></p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="px-6 py-3 border-t border-gray-800 flex justify-end">
+                        <button @click="closeNotification()"
+                                class="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors"
+                                :class="notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' : notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' : 'bg-brand-600 hover:bg-brand-700'">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div x-show="confirmModal.isOpen"
+             x-cloak
+             class="fixed inset-0 z-50 overflow-y-auto"
+             @keydown.escape.window="handleCancel()">
+            <div class="fixed inset-0 bg-black/60" @click="handleCancel()"></div>
+
+            <div class="flex min-h-full items-center justify-center p-6">
+                <div x-show="confirmModal.isOpen"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     @click.stop
+                     class="relative w-96 bg-gray-900 rounded-xl border border-amber-500/50 shadow-xl">
+
+                    <!-- Header -->
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-amber-500/30">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-base font-semibold text-amber-400" x-text="confirmModal.title"></h3>
+                        </div>
+                        <button @click="handleCancel()" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="px-6 py-4">
+                        <p class="text-sm text-gray-300" x-text="confirmModal.message"></p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="px-6 py-3 border-t border-gray-800 flex justify-end gap-3">
+                        <button @click="handleCancel()"
+                                class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                        <button @click="handleConfirm()"
+                                class="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors">
+                            Move Anyway
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -592,6 +919,96 @@
                     unassignedShifts: {{ $unassignedShiftsCount }}
                 },
 
+                // Notification modal state
+                notification: {
+                    isOpen: false,
+                    type: 'info',
+                    title: '',
+                    message: ''
+                },
+
+                showNotification(type, title, message) {
+                    this.notification.type = type;
+                    this.notification.title = title;
+                    this.notification.message = message;
+                    this.notification.isOpen = true;
+                },
+
+                showError(message, title = 'Error') {
+                    this.showNotification('error', title, message);
+                },
+
+                showSuccess(message, title = 'Success') {
+                    this.showNotification('success', title, message);
+                },
+
+                closeNotification() {
+                    this.notification.isOpen = false;
+                },
+
+                showConfirm(title, message, onConfirm, onCancel) {
+                    this.confirmModal.title = title;
+                    this.confirmModal.message = message;
+                    this.confirmModal.onConfirm = onConfirm;
+                    this.confirmModal.onCancel = onCancel;
+                    this.confirmModal.isOpen = true;
+                },
+
+                handleConfirm() {
+                    this.confirmModal.isOpen = false;
+                    if (this.confirmModal.onConfirm) {
+                        this.confirmModal.onConfirm();
+                    }
+                },
+
+                handleCancel() {
+                    this.confirmModal.isOpen = false;
+                    if (this.confirmModal.onCancel) {
+                        this.confirmModal.onCancel();
+                    }
+                },
+
+                // Drag and drop state
+                dragState: {
+                    active: false,
+                    shiftId: null,
+                    shiftElement: null,
+                    originalStartTime: null,
+                    originalEndTime: null,
+                    originalUserId: null,
+                    originalLeft: null,
+                    originalParent: null,
+                    containerRect: null,
+                    dragOffsetX: 0,
+                    dragOffsetY: 0,
+                    targetUserId: null,
+                    targetRow: null,
+                    shiftStatus: null
+                },
+
+                // Confirmation modal state
+                confirmModal: {
+                    isOpen: false,
+                    title: '',
+                    message: '',
+                    onConfirm: null,
+                    onCancel: null
+                },
+
+                // Resize state
+                resizeState: {
+                    active: false,
+                    shiftId: null,
+                    shiftElement: null,
+                    edge: null,
+                    containerRect: null,
+                    originalStartTime: null,
+                    originalEndTime: null,
+                    currentStartTime: null,
+                    currentEndTime: null,
+                    timePreview: null
+                },
+
                 init() {
                     this.initFilters();
 
@@ -606,6 +1023,439 @@
                     window.addEventListener('draft-count-change', (e) => {
                         this.draftCount = Math.max(0, this.draftCount + e.detail.delta);
                     });
+
+                    // Set up global mouse event listeners for drag and resize
+                    document.addEventListener('mousemove', (e) => {
+                        this.handleDragMove(e);
+                        this.handleResizeMove(e);
+                    });
+                    document.addEventListener('mouseup', (e) => {
+                        this.handleDragEnd(e);
+                        this.handleResizeEnd(e);
+                    });
+                },
+
+                // ========================================
+                // Drag Handlers (mouse-based for visual feedback)
+                // ========================================
+
+                startDrag(event, shiftId) {
+                    // Only respond to left mouse button
+                    if (event.button !== 0) return;
+
+                    const shiftElement = event.target.closest('.shift-bar');
+                    if (!shiftElement) return;
+
+                    event.preventDefault();
+
+                    const container = shiftElement.parentElement;
+                    const containerRect = container.getBoundingClientRect();
+                    const shiftRect = shiftElement.getBoundingClientRect();
+
+                    this.dragState.active = true;
+                    this.dragState.shiftId = shiftId;
+                    this.dragState.shiftElement = shiftElement;
+                    this.dragState.originalStartTime = shiftElement.dataset.startTime;
+                    this.dragState.originalEndTime = shiftElement.dataset.endTime;
+                    this.dragState.originalUserId = shiftElement.dataset.userId;
+                    this.dragState.originalLeft = shiftElement.style.left;
+                    this.dragState.originalParent = container;
+                    this.dragState.containerRect = containerRect;
+                    this.dragState.dragOffsetX = event.clientX - shiftRect.left;
+                    this.dragState.dragOffsetY = event.clientY - shiftRect.top;
+                    this.dragState.targetUserId = shiftElement.dataset.userId;
+                    this.dragState.targetRow = null;
+                    this.dragState.shiftStatus = shiftElement.dataset.status;
+
+                    shiftElement.classList.add('dragging');
+                    document.body.classList.add('dragging-active');
+                },
+
+                handleDragMove(event) {
+                    if (!this.dragState.active) return;
+
+                    const element = this.dragState.shiftElement;
+
+                    // Find which schedule-cell we're hovering over
+                    const elementsUnderCursor = document.elementsFromPoint(event.clientX, event.clientY);
+                    const targetCell = elementsUnderCursor.find(el => el.classList.contains('schedule-cell'));
+
+                    // Clear previous row highlight
+                    if (this.dragState.targetRow && this.dragState.targetRow !== targetCell) {
+                        this.dragState.targetRow.classList.remove('drag-over');
+                    }
+
+                    if (targetCell) {
+                        const targetRect = targetCell.getBoundingClientRect();
+                        this.dragState.containerRect = targetRect;
+                        this.dragState.targetUserId = targetCell.dataset.userId || null;
+                        this.dragState.targetRow = targetCell;
+
+                        // Highlight target row if different from original
+                        if (targetCell !== this.dragState.originalParent) {
+                            targetCell.classList.add('drag-over');
+                        }
+
+                        // Move shift element to target cell if different
+                        if (element.parentElement !== targetCell) {
+                            targetCell.appendChild(element);
+                        }
+                    }
+
+                    const rect = this.dragState.containerRect;
+
+                    // Calculate new left position
+                    const newLeftPx = event.clientX - rect.left - this.dragState.dragOffsetX;
+                    const newLeftPercent = (newLeftPx / rect.width) * 100;
+
+                    // Get shift width to clamp properly
+                    const widthPercent = parseFloat(element.style.width);
+
+                    // Clamp to container bounds
+                    const clampedLeft = Math.max(0, Math.min(newLeftPercent, 100 - widthPercent));
+
+                    element.style.left = `${clampedLeft}%`;
+
+                    // Update time display as shift moves
+                    const targetHour = this.dayStartHour + (clampedLeft / 100) * this.numHours;
+                    const snappedHour = Math.round(targetHour * 4) / 4;
+                    const hours = Math.floor(snappedHour);
+                    const minutes = Math.round((snappedHour - hours) * 60);
+
+                    // Calculate end time
+                    const [startH, startM] = this.dragState.originalStartTime.split(':').map(Number);
+                    const [endH, endM] = this.dragState.originalEndTime.split(':').map(Number);
+                    let duration = (endH + endM / 60) - (startH + startM / 60);
+                    if (duration < 0) duration += 24;
+
+                    const endDecimal = snappedHour + duration;
+                    const endHours = Math.floor(endDecimal) % 24;
+                    const endMinutes = Math.round((endDecimal - Math.floor(endDecimal)) * 60);
+
+                    const newStartStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    const newEndStr = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+
+                    // Update display
+                    const timeDisplay = element.querySelector('.shift-time-display');
+                    if (timeDisplay) {
+                        timeDisplay.textContent = `${newStartStr} - ${newEndStr}`;
+                    }
+                },
+
+                async handleDragEnd(event) {
+                    if (!this.dragState.active) return;
+
+                    // Immediately stop tracking mouse movements
+                    this.dragState.active = false;
+
+                    const element = this.dragState.shiftElement;
+                    element.classList.remove('dragging');
+                    document.body.classList.remove('dragging-active');
+
+                    // Clear row highlight
+                    if (this.dragState.targetRow) {
+                        this.dragState.targetRow.classList.remove('drag-over');
+                    }
+
+                    // Calculate final time from current position
+                    const currentLeft = parseFloat(element.style.left);
+                    const targetHour = this.dayStartHour + (currentLeft / 100) * this.numHours;
+                    const snappedHour = Math.round(targetHour * 4) / 4;
+
+                    // Calculate duration
+                    const [startH, startM] = this.dragState.originalStartTime.split(':').map(Number);
+                    const [endH, endM] = this.dragState.originalEndTime.split(':').map(Number);
+                    let duration = (endH + endM / 60) - (startH + startM / 60);
+                    if (duration < 0) duration += 24;
+
+                    const newStartHours = Math.floor(snappedHour);
+                    const newStartMinutes = Math.round((snappedHour - newStartHours) * 60);
+
+                    const newEndDecimal = snappedHour + duration;
+                    const newEndHours = Math.floor(newEndDecimal) % 24;
+                    const newEndMinutes = Math.round((newEndDecimal - Math.floor(newEndDecimal)) * 60);
+
+                    const newStartTime = `${String(newStartHours).padStart(2, '0')}:${String(newStartMinutes).padStart(2, '0')}`;
+                    const newEndTime = `${String(newEndHours).padStart(2, '0')}:${String(newEndMinutes).padStart(2, '0')}`;
+
+                    // Check if time or user changed
+                    const userChanged = this.dragState.targetUserId !== this.dragState.originalUserId;
+                    const timeChanged = newStartTime !== this.dragState.originalStartTime;
+
+                    if (timeChanged || userChanged) {
+                        // Determine the new user_id (could be null for unassigned, or a number)
+                        const newUserId = userChanged ? (this.dragState.targetUserId ? parseInt(this.dragState.targetUserId) : null) : undefined;
+                        const isPublished = this.dragState.shiftStatus === 'published';
+
+                        const success = await this.updateShiftTime(
+                            this.dragState.shiftId,
+                            newStartTime,
+                            newEndTime,
+                            newUserId,
+                            isPublished
+                        );
+
+                        // If update failed (e.g., overlap), revert position
+                        if (!success) {
+                            this.revertDragPosition();
+                        }
+                        this.resetDragState();
+                    } else {
+                        // Reset position if no change (snap back)
+                        this.revertDragPosition();
+                        this.resetDragState();
+                    }
+                },
+
+                revertDragPosition() {
+                    const element = this.dragState.shiftElement;
+                    if (!element) return;
+
+                    // Move back to original parent
+                    if (this.dragState.originalParent && element.parentElement !== this.dragState.originalParent) {
+                        this.dragState.originalParent.appendChild(element);
+                    }
+
+                    // Reset position
+                    element.style.left = this.dragState.originalLeft;
+
+                    // Reset time display
+                    const timeDisplay = element.querySelector('.shift-time-display');
+                    if (timeDisplay) {
+                        timeDisplay.textContent = `${this.dragState.originalStartTime} - ${this.dragState.originalEndTime}`;
+                    }
+                },
+
+                resetDragState() {
+                    this.dragState.active = false;
+                    this.dragState.shiftId = null;
+                    this.dragState.shiftElement = null;
+                    this.dragState.originalStartTime = null;
+                    this.dragState.originalEndTime = null;
+                    this.dragState.originalUserId = null;
+                    this.dragState.originalLeft = null;
+                    this.dragState.originalParent = null;
+                    this.dragState.containerRect = null;
+                    this.dragState.dragOffsetX = 0;
+                    this.dragState.dragOffsetY = 0;
+                    this.dragState.targetUserId = null;
+                    this.dragState.targetRow = null;
+                    this.dragState.shiftStatus = null;
+                },
+
+                // ========================================
+                // Resize Handlers
+                // ========================================
+
+                startResize(event, shiftId, edge) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const shiftElement = event.target.closest('.shift-bar');
+                    if (!shiftElement) return;
+
+                    const container = shiftElement.parentElement;
+                    if (!container) return;
+
+                    this.resizeState.active = true;
+                    this.resizeState.shiftId = shiftId;
+                    this.resizeState.shiftElement = shiftElement;
+                    this.resizeState.edge = edge;
+                    this.resizeState.containerRect = container.getBoundingClientRect();
+                    this.resizeState.originalStartTime = shiftElement.dataset.startTime;
+                    this.resizeState.originalEndTime = shiftElement.dataset.endTime;
+                    this.resizeState.currentStartTime = shiftElement.dataset.startTime;
+                    this.resizeState.currentEndTime = shiftElement.dataset.endTime;
+
+                    // Create time preview tooltip
+                    this.resizeState.timePreview = document.createElement('div');
+                    this.resizeState.timePreview.className = 'time-preview';
+                    this.resizeState.timePreview.textContent = `${this.resizeState.currentStartTime} - ${this.resizeState.currentEndTime}`;
+                    document.body.appendChild(this.resizeState.timePreview);
+                    this.updateTimePreviewPosition(event);
+
+                    // Add resizing class
+                    document.body.classList.add('resizing');
+                    document.body.classList.add('dragging-active');
+                },
+
+                handleResizeMove(event) {
+                    if (!this.resizeState.active) return;
+
+                    const rect = this.resizeState.containerRect;
+                    const relativeX = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+                    const percentX = (relativeX / rect.width) * 100;
+
+                    // Calculate hour from position
+                    const targetHour = this.dayStartHour + (percentX / 100) * this.numHours;
+                    // Snap to 15-minute intervals
+                    const snappedHour = Math.round(targetHour * 4) / 4;
+                    const hours = Math.floor(snappedHour);
+                    const minutes = Math.round((snappedHour - hours) * 60);
+                    const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+                    if (this.resizeState.edge === 'left') {
+                        // Ensure start time is before end time (minimum 15 min shift)
+                        const [endH, endM] = this.resizeState.currentEndTime.split(':').map(Number);
+                        const endDecimal = endH + endM / 60;
+                        if (snappedHour < endDecimal - 0.25) {
+                            this.resizeState.currentStartTime = timeStr;
+                        }
+                    } else {
+                        // Ensure end time is after start time (minimum 15 min shift)
+                        const [startH, startM] = this.resizeState.currentStartTime.split(':').map(Number);
+                        const startDecimal = startH + startM / 60;
+                        if (snappedHour > startDecimal + 0.25) {
+                            this.resizeState.currentEndTime = timeStr;
+                        }
+                    }
+
+                    // Update visual preview
+                    this.updateShiftVisual();
+                    this.updateTimePreviewPosition(event);
+                },
+
+                handleResizeEnd(event) {
+                    if (!this.resizeState.active) return;
+
+                    // Immediately stop tracking mouse movements
+                    this.resizeState.active = false;
+
+                    // Remove time preview
+                    if (this.resizeState.timePreview) {
+                        this.resizeState.timePreview.remove();
+                        this.resizeState.timePreview = null;
+                    }
+
+                    // Remove resizing classes
+                    document.body.classList.remove('resizing');
+                    document.body.classList.remove('dragging-active');
+
+                    // Check if times actually changed
+                    if (this.resizeState.currentStartTime !== this.resizeState.originalStartTime ||
+                        this.resizeState.currentEndTime !== this.resizeState.originalEndTime) {
+                        // Check if shift was published
+                        const wasPublished = this.resizeState.shiftElement?.dataset.status === 'published';
+                        // Save the changes
+                        this.updateShiftTime(
+                            this.resizeState.shiftId,
+                            this.resizeState.currentStartTime,
+                            this.resizeState.currentEndTime,
+                            undefined, // Don't change user
+                            wasPublished
+                        );
+                    }
+
+                    // Reset remaining state
+                    this.resizeState.shiftId = null;
+                    this.resizeState.shiftElement = null;
+                    this.resizeState.edge = null;
+                    this.resizeState.containerRect = null;
+                },
+
+                updateShiftVisual() {
+                    const element = this.resizeState.shiftElement;
+                    if (!element) return;
+
+                    const [startH, startM] = this.resizeState.currentStartTime.split(':').map(Number);
+                    const [endH, endM] = this.resizeState.currentEndTime.split(':').map(Number);
+
+                    let startDecimal = startH + startM / 60;
+                    let endDecimal = endH + endM / 60;
+                    if (endDecimal < startDecimal) endDecimal += 24; // Overnight
+
+                    const leftPercent = ((startDecimal - this.dayStartHour) / this.numHours) * 100;
+                    const widthPercent = ((endDecimal - startDecimal) / this.numHours) * 100;
+
+                    element.style.left = `${Math.max(0, Math.min(100, leftPercent))}%`;
+                    element.style.width = `${Math.max(0, Math.min(100 - leftPercent, widthPercent))}%`;
+
+                    // Update time display and preview tooltip
+                    const timeDisplay = element.querySelector('.shift-time-display');
+                    if (timeDisplay) {
+                        timeDisplay.textContent = `${this.resizeState.currentStartTime} - ${this.resizeState.currentEndTime}`;
+                    }
+
+                    // Update hours display
+                    const hoursDisplay = element.querySelector('.shift-hours-display');
+                    if (hoursDisplay) {
+                        const hours = endDecimal - startDecimal;
+                        hoursDisplay.textContent = `${Math.round(hours * 100) / 100} hrs`;
+                    }
+
+                    // Update preview tooltip
+                    if (this.resizeState.timePreview) {
+                        const hours = endDecimal - startDecimal;
+                        this.resizeState.timePreview.textContent = `${this.resizeState.currentStartTime} - ${this.resizeState.currentEndTime} (${Math.round(hours * 100) / 100}h)`;
+                    }
+                },
+
+                updateTimePreviewPosition(event) {
+                    if (!this.resizeState.timePreview) return;
+                    this.resizeState.timePreview.style.left = `${event.clientX + 10}px`;
+                    this.resizeState.timePreview.style.top = `${event.clientY - 30}px`;
+                },
+
+                // ========================================
+                // API Call to Update Shift
+                // ========================================
+
+                async updateShiftTime(shiftId, startTime, endTime, newUserId, wasPublished = false) {
+                    try {
+                        const body = {
+                            date: this.selectedDate,
+                            start_time: startTime,
+                            end_time: endTime
+                        };
+
+                        // Only include user_id if explicitly changing it (undefined means don't change)
+                        if (newUserId !== undefined) {
+                            body.user_id = newUserId; // null means unassign, number means assign
+                        }
+
+                        const response = await fetch(`/shifts/${shiftId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify(body)
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            console.error('Failed to update shift:', data);
+                            // Get the error message - could be validation error or general error
+                            let errorMessage = data.message || 'Failed to update shift';
+                            if (data.errors) {
+                                // Get first validation error
+                                const firstError = Object.values(data.errors)[0];
+                                errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+                            }
+                            this.showError(errorMessage, 'Cannot Move Shift');
+                            return false;
+                        }
+
+                        // Show warning if shift was published, then reload
+                        if (wasPublished) {
+                            this.showConfirm(
+                                'Shift Moved',
+                                'This shift is already published. If you move it you will need to publish it again.',
+                                () => window.location.reload(),
+                                () => window.location.reload()
+                            );
+                        } else {
+                            // Reload page to reflect changes
+                            window.location.reload();
+                        }
+                        return true;
+                    } catch (error) {
+                        console.error('Error updating shift:', error);
+                        this.showError('An error occurred while updating the shift', 'Error');
+                        return false;
+                    }
                 },
 
                 // Get departments filtered by selected location

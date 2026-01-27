@@ -15,231 +15,692 @@ use App\Models\UserRoleAssignment;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DemoDataSeeder extends Seeder
 {
+    private array $usedEmails = [];
+
+    private int $employeeCounter = 0;
+
     public function run(): void
     {
+        $this->seedHotelChain();
+        $this->seedMedicalFacility();
+        $this->seedLogisticsWarehouse();
+
+        $this->command->info('Demo data seeded successfully!');
+        $this->command->newLine();
+        $this->command->info('=== Hotel Chain (Grand Horizon Hotels) ===');
+        $this->command->info('Admin: admin@grandhorizon.com / password');
+        $this->command->newLine();
+        $this->command->info('=== Medical Facility (Westside Medical Center) ===');
+        $this->command->info('Admin: admin@westsidemedical.com / password');
+        $this->command->newLine();
+        $this->command->info('=== Logistics Warehouse (Swift Logistics) ===');
+        $this->command->info('Admin: admin@swiftlogistics.com / password');
+    }
+
+    private function seedHotelChain(): void
+    {
         $tenant = Tenant::create([
-            'name' => 'Demo Coffee Shop',
-            'slug' => 'demo-coffee-shop',
-            'email' => 'demo@example.com',
-            'phone' => '+1234567890',
-            'address' => '123 Main Street, Demo City',
+            'name' => 'Grand Horizon Hotels',
+            'slug' => 'grand-horizon-hotels',
+            'email' => 'info@grandhorizon.com',
+            'phone' => '+1 (555) 100-0000',
+            'address' => '1 Corporate Plaza, New York, NY 10001',
             'settings' => [
                 'timezone' => 'America/New_York',
                 'date_format' => 'M d, Y',
                 'time_format' => 'h:i A',
             ],
             'is_active' => true,
-            'trial_ends_at' => now()->addDays(14),
+            'trial_ends_at' => now()->addDays(30),
         ]);
 
-        $admin = User::create([
-            'tenant_id' => $tenant->id,
-            'first_name' => 'John',
-            'last_name' => 'Admin',
-            'email' => 'admin@demo.com',
-            'phone' => '+1234567891',
-            'password' => Hash::make('password'),
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
+        $admin = $this->createUser($tenant, 'Marcus', 'Reynolds', 'admin@grandhorizon.com');
+        $this->assignSystemRole($admin, SystemRole::Admin);
 
-        UserRoleAssignment::create([
-            'user_id' => $admin->id,
-            'system_role' => SystemRole::Admin->value,
-        ]);
-
-        $downtown = Location::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Downtown Branch',
-            'address_line_1' => '100 Main Street',
-            'city' => 'Demo City',
-            'state' => 'DC',
-            'postal_code' => '12345',
-            'country' => 'USA',
-            'timezone' => 'America/New_York',
-            'is_active' => true,
-        ]);
-
-        $suburban = Location::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Suburban Mall',
-            'address_line_1' => '500 Mall Road',
-            'city' => 'Demo City',
-            'state' => 'DC',
-            'postal_code' => '12346',
-            'country' => 'USA',
-            'timezone' => 'America/New_York',
-            'is_active' => true,
-        ]);
-
-        $locationAdmin = User::create([
-            'tenant_id' => $tenant->id,
-            'first_name' => 'Sarah',
-            'last_name' => 'Manager',
-            'email' => 'sarah@demo.com',
-            'password' => Hash::make('password'),
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
-
-        UserRoleAssignment::create([
-            'user_id' => $locationAdmin->id,
-            'system_role' => SystemRole::LocationAdmin->value,
-            'location_id' => $downtown->id,
-        ]);
-
-        $frontDesk = Department::create([
-            'tenant_id' => $tenant->id,
-            'location_id' => $downtown->id,
-            'name' => 'Front Counter',
-            'description' => 'Customer service and order taking',
-            'color' => '#3B82F6',
-            'is_active' => true,
-        ]);
-
-        $kitchen = Department::create([
-            'tenant_id' => $tenant->id,
-            'location_id' => $downtown->id,
-            'name' => 'Kitchen',
-            'description' => 'Food and beverage preparation',
-            'color' => '#10B981',
-            'is_active' => true,
-        ]);
-
-        $deptAdmin = User::create([
-            'tenant_id' => $tenant->id,
-            'first_name' => 'Mike',
-            'last_name' => 'Lead',
-            'email' => 'mike@demo.com',
-            'password' => Hash::make('password'),
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
-
-        UserRoleAssignment::create([
-            'user_id' => $deptAdmin->id,
-            'system_role' => SystemRole::DepartmentAdmin->value,
-            'location_id' => $downtown->id,
-            'department_id' => $frontDesk->id,
-        ]);
-
-        $barista = BusinessRole::create([
-            'tenant_id' => $tenant->id,
-            'department_id' => $frontDesk->id,
-            'name' => 'Barista',
-            'description' => 'Coffee preparation and customer service',
-            'color' => '#8B5CF6',
-            'default_hourly_rate' => 15.00,
-            'is_active' => true,
-        ]);
-
-        $cashier = BusinessRole::create([
-            'tenant_id' => $tenant->id,
-            'department_id' => $frontDesk->id,
-            'name' => 'Cashier',
-            'description' => 'Order taking and payment processing',
-            'color' => '#F59E0B',
-            'default_hourly_rate' => 13.50,
-            'is_active' => true,
-        ]);
-
-        $cook = BusinessRole::create([
-            'tenant_id' => $tenant->id,
-            'department_id' => $kitchen->id,
-            'name' => 'Cook',
-            'description' => 'Food preparation',
-            'color' => '#EF4444',
-            'default_hourly_rate' => 16.00,
-            'is_active' => true,
-        ]);
-
-        $employees = [];
-        $employeeData = [
-            ['Jane', 'Doe', 'jane@demo.com', $barista],
-            ['Bob', 'Smith', 'bob@demo.com', $cashier],
-            ['Alice', 'Johnson', 'alice@demo.com', $barista],
-            ['Charlie', 'Brown', 'charlie@demo.com', $cook],
-            ['Diana', 'Wilson', 'diana@demo.com', $cashier],
+        $locations = [
+            [
+                'name' => 'Grand Horizon Downtown',
+                'address_line_1' => '500 Park Avenue',
+                'city' => 'New York',
+                'state' => 'NY',
+                'postal_code' => '10022',
+                'country' => 'USA',
+                'timezone' => 'America/New_York',
+                'has_location_admin' => true,
+            ],
+            [
+                'name' => 'Grand Horizon Beachfront',
+                'address_line_1' => '1200 Ocean Drive',
+                'city' => 'Miami',
+                'state' => 'FL',
+                'postal_code' => '33139',
+                'country' => 'USA',
+                'timezone' => 'America/New_York',
+                'has_location_admin' => true,
+            ],
+            [
+                'name' => 'Grand Horizon Resort & Spa',
+                'address_line_1' => '8800 Las Vegas Blvd',
+                'city' => 'Las Vegas',
+                'state' => 'NV',
+                'postal_code' => '89109',
+                'country' => 'USA',
+                'timezone' => 'America/Los_Angeles',
+                'has_location_admin' => true,
+            ],
+            [
+                'name' => 'Grand Horizon Airport',
+                'address_line_1' => '1 Terminal Way',
+                'city' => 'Chicago',
+                'state' => 'IL',
+                'postal_code' => '60666',
+                'country' => 'USA',
+                'timezone' => 'America/Chicago',
+                'has_location_admin' => true,
+            ],
+            [
+                'name' => 'Grand Horizon Convention Center',
+                'address_line_1' => '950 Convention Blvd',
+                'city' => 'San Diego',
+                'state' => 'CA',
+                'postal_code' => '92101',
+                'country' => 'USA',
+                'timezone' => 'America/Los_Angeles',
+                'has_location_admin' => false, // No location admin - managed by regional admin
+            ],
+            [
+                'name' => 'Grand Horizon Mountain Lodge',
+                'address_line_1' => '200 Ski Valley Road',
+                'city' => 'Aspen',
+                'state' => 'CO',
+                'postal_code' => '81611',
+                'country' => 'USA',
+                'timezone' => 'America/Denver',
+                'has_location_admin' => true,
+            ],
+            [
+                'name' => 'Grand Horizon Waterfront',
+                'address_line_1' => '75 Harbor Drive',
+                'city' => 'Seattle',
+                'state' => 'WA',
+                'postal_code' => '98101',
+                'country' => 'USA',
+                'timezone' => 'America/Los_Angeles',
+                'has_location_admin' => false, // No location admin - newer property
+            ],
         ];
 
-        foreach ($employeeData as [$first, $last, $email, $role]) {
-            $user = User::create([
+        $departmentConfigs = $this->getHotelDepartments();
+
+        foreach ($locations as $locationData) {
+            $hasLocationAdmin = $locationData['has_location_admin'] ?? true;
+            unset($locationData['has_location_admin']);
+
+            $location = Location::create([
                 'tenant_id' => $tenant->id,
-                'first_name' => $first,
-                'last_name' => $last,
-                'email' => $email,
-                'password' => Hash::make('password'),
+                ...$locationData,
                 'is_active' => true,
-                'email_verified_at' => now(),
             ]);
+
+            if ($hasLocationAdmin) {
+                $locationAdmin = $this->createUser(
+                    $tenant,
+                    fake()->firstName(),
+                    fake()->lastName(),
+                    $this->generateEmail('manager', $locationData['city'])
+                );
+                $this->assignSystemRole($locationAdmin, SystemRole::LocationAdmin, $location);
+            }
+
+            foreach ($departmentConfigs as $deptConfig) {
+                $department = Department::create([
+                    'tenant_id' => $tenant->id,
+                    'location_id' => $location->id,
+                    'name' => $deptConfig['name'],
+                    'description' => $deptConfig['description'],
+                    'color' => $deptConfig['color'],
+                    'is_active' => true,
+                ]);
+
+                $deptAdmin = $this->createUser(
+                    $tenant,
+                    fake()->firstName(),
+                    fake()->lastName(),
+                    $this->generateEmail(Str::slug($deptConfig['name']).'-lead', $locationData['city'])
+                );
+                $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
+
+                $roles = [];
+                foreach ($deptConfig['roles'] as $roleConfig) {
+                    $roles[] = BusinessRole::create([
+                        'tenant_id' => $tenant->id,
+                        'department_id' => $department->id,
+                        'name' => $roleConfig['name'],
+                        'description' => $roleConfig['description'],
+                        'color' => $roleConfig['color'],
+                        'default_hourly_rate' => $roleConfig['rate'],
+                        'is_active' => true,
+                    ]);
+                }
+
+                $this->createEmployeesForDepartment($tenant, $department, $roles, rand(4, 8));
+            }
+        }
+    }
+
+    private function seedMedicalFacility(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Westside Medical Center',
+            'slug' => 'westside-medical-center',
+            'email' => 'info@westsidemedical.com',
+            'phone' => '+1 (555) 200-0000',
+            'address' => '2500 Medical Center Drive, Chicago, IL 60612',
+            'settings' => [
+                'timezone' => 'America/Chicago',
+                'date_format' => 'M d, Y',
+                'time_format' => 'h:i A',
+            ],
+            'is_active' => true,
+            'trial_ends_at' => now()->addDays(30),
+        ]);
+
+        $admin = $this->createUser($tenant, 'Dr. Elizabeth', 'Chen', 'admin@westsidemedical.com');
+        $this->assignSystemRole($admin, SystemRole::Admin);
+
+        $location = Location::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Westside Medical Center - Main Campus',
+            'address_line_1' => '2500 Medical Center Drive',
+            'city' => 'Chicago',
+            'state' => 'IL',
+            'postal_code' => '60612',
+            'country' => 'USA',
+            'timezone' => 'America/Chicago',
+            'is_active' => true,
+        ]);
+
+        $locationAdmin = $this->createUser($tenant, 'James', 'Morrison', 'operations@westsidemedical.com');
+        $this->assignSystemRole($locationAdmin, SystemRole::LocationAdmin, $location);
+
+        $departmentConfigs = $this->getMedicalDepartments();
+
+        foreach ($departmentConfigs as $deptConfig) {
+            $department = Department::create([
+                'tenant_id' => $tenant->id,
+                'location_id' => $location->id,
+                'name' => $deptConfig['name'],
+                'description' => $deptConfig['description'],
+                'color' => $deptConfig['color'],
+                'is_active' => true,
+            ]);
+
+            $deptAdmin = $this->createUser(
+                $tenant,
+                fake()->firstName(),
+                fake()->lastName(),
+                $this->generateEmail(Str::slug($deptConfig['name']).'-supervisor', 'westside')
+            );
+            $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
+
+            $roles = [];
+            foreach ($deptConfig['roles'] as $roleConfig) {
+                $roles[] = BusinessRole::create([
+                    'tenant_id' => $tenant->id,
+                    'department_id' => $department->id,
+                    'name' => $roleConfig['name'],
+                    'description' => $roleConfig['description'],
+                    'color' => $roleConfig['color'],
+                    'default_hourly_rate' => $roleConfig['rate'],
+                    'is_active' => true,
+                ]);
+            }
+
+            $this->createEmployeesForDepartment($tenant, $department, $roles, rand(4, 8));
+        }
+    }
+
+    private function seedLogisticsWarehouse(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Swift Logistics',
+            'slug' => 'swift-logistics',
+            'email' => 'info@swiftlogistics.com',
+            'phone' => '+1 (555) 300-0000',
+            'address' => '7500 Industrial Parkway, Dallas, TX 75247',
+            'settings' => [
+                'timezone' => 'America/Chicago',
+                'date_format' => 'M d, Y',
+                'time_format' => 'h:i A',
+            ],
+            'is_active' => true,
+            'trial_ends_at' => now()->addDays(30),
+        ]);
+
+        $admin = $this->createUser($tenant, 'Robert', 'Thornton', 'admin@swiftlogistics.com');
+        $this->assignSystemRole($admin, SystemRole::Admin);
+
+        $location = Location::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Swift Logistics Distribution Center',
+            'address_line_1' => '7500 Industrial Parkway',
+            'city' => 'Dallas',
+            'state' => 'TX',
+            'postal_code' => '75247',
+            'country' => 'USA',
+            'timezone' => 'America/Chicago',
+            'is_active' => true,
+        ]);
+
+        $locationAdmin = $this->createUser($tenant, 'Patricia', 'Vega', 'operations@swiftlogistics.com');
+        $this->assignSystemRole($locationAdmin, SystemRole::LocationAdmin, $location);
+
+        $departmentConfigs = $this->getLogisticsDepartments();
+
+        foreach ($departmentConfigs as $deptConfig) {
+            $department = Department::create([
+                'tenant_id' => $tenant->id,
+                'location_id' => $location->id,
+                'name' => $deptConfig['name'],
+                'description' => $deptConfig['description'],
+                'color' => $deptConfig['color'],
+                'is_active' => true,
+            ]);
+
+            $deptAdmin = $this->createUser(
+                $tenant,
+                fake()->firstName(),
+                fake()->lastName(),
+                $this->generateEmail(Str::slug($deptConfig['name']).'-lead', 'swift')
+            );
+            $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
+
+            $roles = [];
+            foreach ($deptConfig['roles'] as $roleConfig) {
+                $roles[] = BusinessRole::create([
+                    'tenant_id' => $tenant->id,
+                    'department_id' => $department->id,
+                    'name' => $roleConfig['name'],
+                    'description' => $roleConfig['description'],
+                    'color' => $roleConfig['color'],
+                    'default_hourly_rate' => $roleConfig['rate'],
+                    'is_active' => true,
+                ]);
+            }
+
+            $this->createEmployeesForDepartment($tenant, $department, $roles, rand(4, 8));
+        }
+    }
+
+    private function getHotelDepartments(): array
+    {
+        return [
+            [
+                'name' => 'Reception',
+                'description' => 'Front desk operations and guest services',
+                'color' => '#3B82F6',
+                'roles' => [
+                    ['name' => 'Front Desk Agent', 'description' => 'Check-in/out, reservations, guest inquiries', 'color' => '#60A5FA', 'rate' => 16.00],
+                    ['name' => 'Concierge', 'description' => 'Guest assistance, recommendations, bookings', 'color' => '#2563EB', 'rate' => 18.00],
+                    ['name' => 'Night Auditor', 'description' => 'Overnight front desk and daily reconciliation', 'color' => '#1D4ED8', 'rate' => 17.50],
+                ],
+            ],
+            [
+                'name' => 'Housekeeping',
+                'description' => 'Room cleaning and maintenance of cleanliness standards',
+                'color' => '#10B981',
+                'roles' => [
+                    ['name' => 'Room Attendant', 'description' => 'Guest room cleaning and turndown service', 'color' => '#34D399', 'rate' => 14.00],
+                    ['name' => 'Housekeeping Supervisor', 'description' => 'Oversee housekeeping staff and inspect rooms', 'color' => '#059669', 'rate' => 18.00],
+                    ['name' => 'Laundry Attendant', 'description' => 'Linens processing and uniform care', 'color' => '#047857', 'rate' => 13.50],
+                ],
+            ],
+            [
+                'name' => 'Restaurant',
+                'description' => 'Hotel dining and room service operations',
+                'color' => '#F59E0B',
+                'roles' => [
+                    ['name' => 'Server', 'description' => 'Food and beverage service to guests', 'color' => '#FBBF24', 'rate' => 12.00],
+                    ['name' => 'Host/Hostess', 'description' => 'Guest seating and reservations management', 'color' => '#F59E0B', 'rate' => 13.00],
+                    ['name' => 'Food Runner', 'description' => 'Deliver food from kitchen to tables', 'color' => '#D97706', 'rate' => 11.50],
+                    ['name' => 'Room Service Attendant', 'description' => 'In-room dining delivery and setup', 'color' => '#B45309', 'rate' => 13.00],
+                ],
+            ],
+            [
+                'name' => 'Bar',
+                'description' => 'Beverage service and lounge operations',
+                'color' => '#8B5CF6',
+                'roles' => [
+                    ['name' => 'Bartender', 'description' => 'Craft cocktails and beverage service', 'color' => '#A78BFA', 'rate' => 15.00],
+                    ['name' => 'Barback', 'description' => 'Bar setup, stocking, and support', 'color' => '#7C3AED', 'rate' => 12.00],
+                ],
+            ],
+            [
+                'name' => 'Kitchen',
+                'description' => 'Food preparation and culinary operations',
+                'color' => '#EF4444',
+                'roles' => [
+                    ['name' => 'Executive Chef', 'description' => 'Menu development and kitchen management', 'color' => '#F87171', 'rate' => 32.00],
+                    ['name' => 'Sous Chef', 'description' => 'Assistant to executive chef, line supervision', 'color' => '#EF4444', 'rate' => 24.00],
+                    ['name' => 'Line Cook', 'description' => 'Station cooking and food preparation', 'color' => '#DC2626', 'rate' => 16.00],
+                    ['name' => 'Prep Cook', 'description' => 'Ingredient preparation and mise en place', 'color' => '#B91C1C', 'rate' => 14.00],
+                    ['name' => 'Dishwasher', 'description' => 'Kitchen sanitation and dishwashing', 'color' => '#991B1B', 'rate' => 12.00],
+                ],
+            ],
+            [
+                'name' => 'Maintenance',
+                'description' => 'Building maintenance and facility upkeep',
+                'color' => '#6B7280',
+                'roles' => [
+                    ['name' => 'Maintenance Technician', 'description' => 'Repairs and preventive maintenance', 'color' => '#9CA3AF', 'rate' => 20.00],
+                    ['name' => 'Groundskeeper', 'description' => 'Exterior maintenance and landscaping', 'color' => '#6B7280', 'rate' => 15.00],
+                ],
+            ],
+            [
+                'name' => 'Spa & Wellness',
+                'description' => 'Spa services and wellness facilities',
+                'color' => '#EC4899',
+                'roles' => [
+                    ['name' => 'Spa Receptionist', 'description' => 'Spa bookings and guest coordination', 'color' => '#F472B6', 'rate' => 14.00],
+                    ['name' => 'Massage Therapist', 'description' => 'Therapeutic massage services', 'color' => '#EC4899', 'rate' => 25.00],
+                    ['name' => 'Fitness Attendant', 'description' => 'Gym supervision and equipment assistance', 'color' => '#DB2777', 'rate' => 13.00],
+                ],
+            ],
+        ];
+    }
+
+    private function getMedicalDepartments(): array
+    {
+        return [
+            [
+                'name' => 'Emergency Department',
+                'description' => 'Emergency and urgent care services',
+                'color' => '#EF4444',
+                'roles' => [
+                    ['name' => 'ER Nurse', 'description' => 'Emergency nursing care and triage', 'color' => '#F87171', 'rate' => 38.00],
+                    ['name' => 'ER Technician', 'description' => 'Emergency medical technician support', 'color' => '#EF4444', 'rate' => 22.00],
+                    ['name' => 'Triage Nurse', 'description' => 'Patient assessment and prioritization', 'color' => '#DC2626', 'rate' => 36.00],
+                ],
+            ],
+            [
+                'name' => 'Nursing',
+                'description' => 'Inpatient nursing care and patient services',
+                'color' => '#3B82F6',
+                'roles' => [
+                    ['name' => 'Registered Nurse', 'description' => 'Patient care and medication administration', 'color' => '#60A5FA', 'rate' => 35.00],
+                    ['name' => 'Licensed Practical Nurse', 'description' => 'Basic nursing care under RN supervision', 'color' => '#3B82F6', 'rate' => 24.00],
+                    ['name' => 'Certified Nursing Assistant', 'description' => 'Patient support and daily care assistance', 'color' => '#2563EB', 'rate' => 16.00],
+                    ['name' => 'Charge Nurse', 'description' => 'Unit coordination and staff supervision', 'color' => '#1D4ED8', 'rate' => 40.00],
+                ],
+            ],
+            [
+                'name' => 'Administration',
+                'description' => 'Patient registration and medical records',
+                'color' => '#6B7280',
+                'roles' => [
+                    ['name' => 'Patient Registrar', 'description' => 'Patient check-in and registration', 'color' => '#9CA3AF', 'rate' => 16.00],
+                    ['name' => 'Medical Records Clerk', 'description' => 'Health records management and filing', 'color' => '#6B7280', 'rate' => 17.00],
+                    ['name' => 'Billing Specialist', 'description' => 'Insurance claims and patient billing', 'color' => '#4B5563', 'rate' => 20.00],
+                    ['name' => 'Unit Secretary', 'description' => 'Administrative support for clinical units', 'color' => '#374151', 'rate' => 15.00],
+                ],
+            ],
+            [
+                'name' => 'Laboratory',
+                'description' => 'Diagnostic testing and laboratory services',
+                'color' => '#10B981',
+                'roles' => [
+                    ['name' => 'Medical Lab Technologist', 'description' => 'Laboratory testing and analysis', 'color' => '#34D399', 'rate' => 28.00],
+                    ['name' => 'Phlebotomist', 'description' => 'Blood collection and specimen handling', 'color' => '#10B981', 'rate' => 18.00],
+                    ['name' => 'Lab Assistant', 'description' => 'Laboratory support and specimen processing', 'color' => '#059669', 'rate' => 15.00],
+                ],
+            ],
+            [
+                'name' => 'Radiology',
+                'description' => 'Medical imaging and diagnostic radiology',
+                'color' => '#8B5CF6',
+                'roles' => [
+                    ['name' => 'Radiologic Technologist', 'description' => 'X-ray and imaging procedures', 'color' => '#A78BFA', 'rate' => 30.00],
+                    ['name' => 'CT Technologist', 'description' => 'Computed tomography imaging', 'color' => '#8B5CF6', 'rate' => 32.00],
+                    ['name' => 'MRI Technologist', 'description' => 'Magnetic resonance imaging', 'color' => '#7C3AED', 'rate' => 34.00],
+                ],
+            ],
+            [
+                'name' => 'Pharmacy',
+                'description' => 'Medication dispensing and pharmaceutical services',
+                'color' => '#F59E0B',
+                'roles' => [
+                    ['name' => 'Clinical Pharmacist', 'description' => 'Medication review and patient consultation', 'color' => '#FBBF24', 'rate' => 58.00],
+                    ['name' => 'Pharmacy Technician', 'description' => 'Medication preparation and dispensing', 'color' => '#F59E0B', 'rate' => 18.00],
+                ],
+            ],
+            [
+                'name' => 'Environmental Services',
+                'description' => 'Facility cleanliness and sanitation',
+                'color' => '#14B8A6',
+                'roles' => [
+                    ['name' => 'EVS Technician', 'description' => 'Healthcare facility cleaning and sanitation', 'color' => '#2DD4BF', 'rate' => 14.00],
+                    ['name' => 'EVS Supervisor', 'description' => 'Environmental services team supervision', 'color' => '#14B8A6', 'rate' => 18.00],
+                ],
+            ],
+            [
+                'name' => 'Patient Transport',
+                'description' => 'Patient movement and transport services',
+                'color' => '#EC4899',
+                'roles' => [
+                    ['name' => 'Patient Transporter', 'description' => 'Patient wheelchair and stretcher transport', 'color' => '#F472B6', 'rate' => 14.00],
+                    ['name' => 'Transport Coordinator', 'description' => 'Transport scheduling and dispatch', 'color' => '#EC4899', 'rate' => 17.00],
+                ],
+            ],
+        ];
+    }
+
+    private function getLogisticsDepartments(): array
+    {
+        return [
+            [
+                'name' => 'Receiving',
+                'description' => 'Inbound freight and inventory receiving',
+                'color' => '#3B82F6',
+                'roles' => [
+                    ['name' => 'Receiving Clerk', 'description' => 'Document verification and data entry', 'color' => '#60A5FA', 'rate' => 16.00],
+                    ['name' => 'Dock Worker', 'description' => 'Unloading and staging incoming freight', 'color' => '#3B82F6', 'rate' => 17.00],
+                    ['name' => 'Receiving Supervisor', 'description' => 'Receiving operations oversight', 'color' => '#2563EB', 'rate' => 22.00],
+                ],
+            ],
+            [
+                'name' => 'Warehouse Operations',
+                'description' => 'Storage, inventory management, and order fulfillment',
+                'color' => '#F59E0B',
+                'roles' => [
+                    ['name' => 'Warehouse Associate', 'description' => 'Picking, packing, and inventory handling', 'color' => '#FBBF24', 'rate' => 16.00],
+                    ['name' => 'Forklift Operator', 'description' => 'Material handling and pallet movement', 'color' => '#F59E0B', 'rate' => 19.00],
+                    ['name' => 'Inventory Specialist', 'description' => 'Cycle counts and inventory accuracy', 'color' => '#D97706', 'rate' => 18.00],
+                    ['name' => 'Order Picker', 'description' => 'Order selection and fulfillment', 'color' => '#B45309', 'rate' => 16.50],
+                ],
+            ],
+            [
+                'name' => 'Shipping',
+                'description' => 'Outbound logistics and freight dispatch',
+                'color' => '#10B981',
+                'roles' => [
+                    ['name' => 'Shipping Clerk', 'description' => 'Shipping documentation and scheduling', 'color' => '#34D399', 'rate' => 16.00],
+                    ['name' => 'Packer', 'description' => 'Order packaging and labeling', 'color' => '#10B981', 'rate' => 15.00],
+                    ['name' => 'Shipping Supervisor', 'description' => 'Outbound operations management', 'color' => '#059669', 'rate' => 22.00],
+                ],
+            ],
+            [
+                'name' => 'Quality Control',
+                'description' => 'Product inspection and quality assurance',
+                'color' => '#8B5CF6',
+                'roles' => [
+                    ['name' => 'Quality Inspector', 'description' => 'Product inspection and defect identification', 'color' => '#A78BFA', 'rate' => 18.00],
+                    ['name' => 'QC Auditor', 'description' => 'Quality audits and compliance checks', 'color' => '#8B5CF6', 'rate' => 20.00],
+                ],
+            ],
+            [
+                'name' => 'Administration',
+                'description' => 'Office operations and administrative support',
+                'color' => '#6B7280',
+                'roles' => [
+                    ['name' => 'Office Administrator', 'description' => 'General administrative duties and coordination', 'color' => '#9CA3AF', 'rate' => 18.00],
+                    ['name' => 'Data Entry Clerk', 'description' => 'System data entry and record maintenance', 'color' => '#6B7280', 'rate' => 15.00],
+                    ['name' => 'Customer Service Rep', 'description' => 'Client inquiries and order support', 'color' => '#4B5563', 'rate' => 16.00],
+                ],
+            ],
+            [
+                'name' => 'Facility Maintenance',
+                'description' => 'Building and equipment maintenance',
+                'color' => '#EF4444',
+                'roles' => [
+                    ['name' => 'Maintenance Technician', 'description' => 'Equipment repairs and preventive maintenance', 'color' => '#F87171', 'rate' => 22.00],
+                    ['name' => 'Janitorial Staff', 'description' => 'Facility cleaning and sanitation', 'color' => '#EF4444', 'rate' => 14.00],
+                ],
+            ],
+            [
+                'name' => 'Transportation',
+                'description' => 'Fleet operations and delivery coordination',
+                'color' => '#EC4899',
+                'roles' => [
+                    ['name' => 'Delivery Driver', 'description' => 'Local delivery and customer service', 'color' => '#F472B6', 'rate' => 18.00],
+                    ['name' => 'Route Coordinator', 'description' => 'Delivery route planning and optimization', 'color' => '#EC4899', 'rate' => 20.00],
+                    ['name' => 'Fleet Dispatcher', 'description' => 'Driver dispatch and communication', 'color' => '#DB2777', 'rate' => 19.00],
+                ],
+            ],
+        ];
+    }
+
+    private function createUser(Tenant $tenant, string $firstName, string $lastName, string $email): User
+    {
+        return User::create([
+            'tenant_id' => $tenant->id,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'phone' => fake()->phoneNumber(),
+            'password' => Hash::make('password'),
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+    }
+
+    private function assignSystemRole(
+        User $user,
+        SystemRole $role,
+        ?Location $location = null,
+        ?Department $department = null
+    ): void {
+        UserRoleAssignment::create([
+            'user_id' => $user->id,
+            'system_role' => $role->value,
+            'location_id' => $location?->id,
+            'department_id' => $department?->id,
+        ]);
+    }
+
+    private function createEmployeesForDepartment(
+        Tenant $tenant,
+        Department $department,
+        array $roles,
+        int $count
+    ): void {
+        $employees = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $this->employeeCounter++;
+            $user = $this->createUser(
+                $tenant,
+                fake()->firstName(),
+                fake()->lastName(),
+                $this->generateEmail('employee'.$this->employeeCounter, Str::slug($tenant->name))
+            );
 
             UserRoleAssignment::create([
                 'user_id' => $user->id,
                 'system_role' => SystemRole::Employee->value,
             ]);
 
+            $primaryRole = $roles[array_rand($roles)];
             UserBusinessRole::create([
                 'user_id' => $user->id,
-                'business_role_id' => $role->id,
+                'business_role_id' => $primaryRole->id,
                 'is_primary' => true,
             ]);
 
-            $employees[] = $user;
-        }
-
-        $startOfWeek = Carbon::now()->startOfWeek();
-
-        $shifts = [
-            [$employees[0], $barista, '06:00', '14:00'],
-            [$employees[1], $cashier, '06:00', '14:00'],
-            [$employees[2], $barista, '14:00', '22:00'],
-            [$employees[3], $cook, '06:00', '14:00'],
-            [$employees[4], $cashier, '14:00', '22:00'],
-        ];
-
-        for ($day = 0; $day < 7; $day++) {
-            $date = $startOfWeek->copy()->addDays($day);
-
-            if ($day < 5) {
-                foreach ($shifts as [$user, $role, $start, $end]) {
-                    Shift::create([
-                        'tenant_id' => $tenant->id,
-                        'location_id' => $downtown->id,
-                        'department_id' => $role->department_id,
-                        'business_role_id' => $role->id,
+            if (count($roles) > 1 && rand(1, 100) <= 30) {
+                $secondaryRoles = array_filter($roles, fn ($r) => $r->id !== $primaryRole->id);
+                if (! empty($secondaryRoles)) {
+                    $secondaryRole = $secondaryRoles[array_rand($secondaryRoles)];
+                    UserBusinessRole::create([
                         'user_id' => $user->id,
-                        'date' => $date,
-                        'start_time' => $start,
-                        'end_time' => $end,
-                        'break_duration_minutes' => 30,
-                        'status' => ShiftStatus::Published,
-                        'created_by' => $admin->id,
+                        'business_role_id' => $secondaryRole->id,
+                        'is_primary' => false,
                     ]);
                 }
             }
 
-            Shift::create([
-                'tenant_id' => $tenant->id,
-                'location_id' => $downtown->id,
-                'department_id' => $frontDesk->id,
-                'business_role_id' => $barista->id,
-                'user_id' => null,
-                'date' => $date,
-                'start_time' => '10:00',
-                'end_time' => '18:00',
-                'break_duration_minutes' => 30,
-                'status' => ShiftStatus::Published,
-                'created_by' => $admin->id,
-            ]);
+            $employees[] = ['user' => $user, 'primaryRole' => $primaryRole];
         }
 
-        $this->command->info('Demo data seeded successfully!');
-        $this->command->info('Admin login: admin@demo.com / password');
-        $this->command->info('Location Admin: sarah@demo.com / password');
-        $this->command->info('Department Admin: mike@demo.com / password');
-        $this->command->info('Employee: jane@demo.com / password');
+        $this->createShiftsForEmployees($tenant, $department, $employees);
+    }
+
+    private function createShiftsForEmployees(Tenant $tenant, Department $department, array $employees): void
+    {
+        $startOfWeek = Carbon::now()->startOfWeek();
+
+        $shiftPatterns = [
+            ['start' => '06:00', 'end' => '14:00'],
+            ['start' => '07:00', 'end' => '15:00'],
+            ['start' => '08:00', 'end' => '16:00'],
+            ['start' => '09:00', 'end' => '17:00'],
+            ['start' => '14:00', 'end' => '22:00'],
+            ['start' => '15:00', 'end' => '23:00'],
+            ['start' => '22:00', 'end' => '06:00'],
+        ];
+
+        foreach ($employees as $index => $employeeData) {
+            $user = $employeeData['user'];
+            $role = $employeeData['primaryRole'];
+            $pattern = $shiftPatterns[$index % count($shiftPatterns)];
+
+            for ($day = 0; $day < 7; $day++) {
+                if (rand(1, 100) <= 70) {
+                    $date = $startOfWeek->copy()->addDays($day);
+
+                    Shift::create([
+                        'tenant_id' => $tenant->id,
+                        'location_id' => $department->location_id,
+                        'department_id' => $department->id,
+                        'business_role_id' => $role->id,
+                        'user_id' => $user->id,
+                        'date' => $date,
+                        'start_time' => $pattern['start'],
+                        'end_time' => $pattern['end'],
+                        'break_duration_minutes' => 30,
+                        'status' => ShiftStatus::Published,
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function generateEmail(string $prefix, string $domain): string
+    {
+        $baseEmail = Str::slug($prefix).'@'.Str::slug($domain).'.demo';
+        $email = $baseEmail;
+        $counter = 1;
+
+        while (in_array($email, $this->usedEmails)) {
+            $email = Str::slug($prefix).$counter.'@'.Str::slug($domain).'.demo';
+            $counter++;
+        }
+
+        $this->usedEmails[] = $email;
+
+        return $email;
     }
 }

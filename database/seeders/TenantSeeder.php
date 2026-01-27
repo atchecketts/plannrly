@@ -30,11 +30,11 @@ class TenantSeeder extends Seeder
         );
 
         $superAdmin = User::firstOrCreate(
-            ['email' => 'admin@plannrly.com'],
+            ['email' => 'atchecketts@gmail.com'],
             [
                 'tenant_id' => $plannrly->id,
-                'first_name' => 'Super',
-                'last_name' => 'Admin',
+                'first_name' => 'Adrian',
+                'last_name' => 'SuperAdmin',
                 'password' => Hash::make('password'),
                 'is_active' => true,
                 'email_verified_at' => now(),

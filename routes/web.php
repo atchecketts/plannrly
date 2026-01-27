@@ -7,13 +7,12 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LocationController;
-use App\Http\Controllers\MyShiftsController;
-use App\Http\Controllers\MySwapsController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapController;
-use App\Http\Controllers\TimeClockController;
+use App\Http\Controllers\SuperAdmin\ImpersonationController;
+use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
+use App\Http\Controllers\SuperAdmin\UserController as SuperAdminUserController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserFilterController;
 use Illuminate\Support\Facades\Route;
@@ -39,22 +38,13 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('locations/mobile', [LocationController::class, 'mobile'])->name('locations.mobile');
     Route::resource('locations', LocationController::class);
-
-    Route::get('departments/mobile', [DepartmentController::class, 'mobile'])->name('departments.mobile');
     Route::resource('departments', DepartmentController::class)->except(['show']);
-
-    Route::get('business-roles/mobile', [BusinessRoleController::class, 'mobile'])->name('business-roles.mobile');
     Route::resource('business-roles', BusinessRoleController::class)->except(['show']);
-
-    Route::get('users/mobile', [UserController::class, 'mobile'])->name('users.mobile');
     Route::resource('users', UserController::class);
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('schedule.index');
     Route::get('schedule/day', [ScheduleController::class, 'day'])->name('schedule.day');
-    Route::get('schedule/mobile', [ScheduleController::class, 'mobile'])->name('schedule.mobile');
-    Route::get('schedule/mobile/day', [ScheduleController::class, 'mobileDay'])->name('schedule.mobile.day');
     Route::get('schedule/draft-count', [ScheduleController::class, 'draftCount'])->name('schedule.draft-count');
     Route::post('schedule/publish', [ScheduleController::class, 'publishAll'])->name('schedule.publish');
 
@@ -66,7 +56,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('shifts/{shift}/publish', [ShiftController::class, 'publish'])->name('shifts.publish');
     Route::get('shifts/{shift}/available-users', [ShiftController::class, 'availableUsers'])->name('shifts.available-users');
 
-    Route::get('leave-requests/mobile', [LeaveRequestController::class, 'mobile'])->name('leave-requests.mobile');
     Route::resource('leave-requests', LeaveRequestController::class)->except(['edit', 'update']);
     Route::post('leave-requests/{leaveRequest}/submit', [LeaveRequestController::class, 'submit'])->name('leave-requests.submit');
     Route::post('leave-requests/{leaveRequest}/review', [LeaveRequestController::class, 'review'])->name('leave-requests.review');
@@ -81,26 +70,24 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::post('user/filter-defaults', [UserFilterController::class, 'storeDefault'])->name('user.filter-defaults.store');
     Route::get('user/filter-defaults', [UserFilterController::class, 'getDefault'])->name('user.filter-defaults.show');
-
-    // Employee Mobile Routes
-    Route::get('my-shifts', [MyShiftsController::class, 'index'])->name('my-shifts.index');
-
-    Route::get('time-clock', [TimeClockController::class, 'index'])->name('time-clock.index');
-    Route::post('time-clock/clock-in', [TimeClockController::class, 'clockIn'])->name('time-clock.clock-in');
-    Route::post('time-clock/clock-out', [TimeClockController::class, 'clockOut'])->name('time-clock.clock-out');
-    Route::post('time-clock/start-break', [TimeClockController::class, 'startBreak'])->name('time-clock.start-break');
-    Route::post('time-clock/end-break', [TimeClockController::class, 'endBreak'])->name('time-clock.end-break');
-
-    Route::get('my-swaps', [MySwapsController::class, 'index'])->name('my-swaps.index');
-    Route::get('my-swaps/create/{shift}', [MySwapsController::class, 'create'])->name('my-swaps.create');
-    Route::post('my-swaps', [MySwapsController::class, 'store'])->name('my-swaps.store');
-
-    Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
-    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
-
-    Route::get('my-leave', [LeaveRequestController::class, 'myRequests'])->name('my-leave.index');
-    Route::get('my-leave/create', [LeaveRequestController::class, 'myCreate'])->name('my-leave.create');
 });
+
+// Super Admin Routes
+Route::middleware(['auth', 'super-admin'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::get('tenants', [SuperAdminTenantController::class, 'index'])->name('tenants.index');
+    Route::get('tenants/{tenant}', [SuperAdminTenantController::class, 'show'])->name('tenants.show');
+    Route::get('tenants/{tenant}/edit', [SuperAdminTenantController::class, 'edit'])->name('tenants.edit');
+    Route::put('tenants/{tenant}', [SuperAdminTenantController::class, 'update'])->name('tenants.update');
+    Route::post('tenants/{tenant}/toggle-status', [SuperAdminTenantController::class, 'toggleStatus'])->name('tenants.toggle-status');
+
+    Route::get('users', [SuperAdminUserController::class, 'index'])->name('users.index');
+    Route::get('users/{user}', [SuperAdminUserController::class, 'show'])->name('users.show');
+
+    Route::post('impersonate/{user}', [ImpersonationController::class, 'start'])->name('impersonate.start');
+});
+
+// Stop impersonation route (accessible when impersonating)
+Route::middleware('auth')->post('stop-impersonating', [ImpersonationController::class, 'stop'])->name('impersonate.stop');
 
 Route::prefix('samples')->group(function () {
     Route::view('/', 'samples.index');
@@ -108,5 +95,4 @@ Route::prefix('samples')->group(function () {
     Route::view('/register', 'samples.register');
     Route::view('/admin-dashboard', 'samples.admin-dashboard');
     Route::view('/schedule', 'samples.schedule');
-    Route::view('/employee-mobile', 'samples.employee-mobile');
 });

@@ -80,32 +80,6 @@
                     </div>
                 </a>
 
-                <!-- Employee Mobile -->
-                <a href="/samples/employee-mobile" class="group bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden hover:border-brand-700 transition-all md:col-span-2">
-                    <div class="md:flex">
-                        <div class="md:w-1/3 aspect-video md:aspect-auto bg-brand-900 flex items-center justify-center p-8 relative overflow-hidden">
-                            <div class="absolute inset-0 opacity-20">
-                                <div class="absolute top-10 left-10 w-32 h-32 bg-white rounded-full blur-3xl"></div>
-                            </div>
-                            <div class="text-center text-white relative">
-                                <svg class="w-16 h-16 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                <span class="text-sm opacity-75">Mobile Preview</span>
-                            </div>
-                        </div>
-                        <div class="p-6 md:flex-1">
-                            <h3 class="text-lg font-semibold text-white group-hover:text-brand-400 transition-colors">Employee Mobile View</h3>
-                            <p class="text-sm text-gray-500 mt-1">Dedicated mobile experience with clock in/out, upcoming shifts, and leave balance</p>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <span class="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-full">Clock In/Out</span>
-                                <span class="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-full">View Shifts</span>
-                                <span class="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-full">Leave Balance</span>
-                                <span class="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-full">Bottom Nav</span>
-                            </div>
-                        </div>
-                    </div>
-                </a>
             </div>
 
             <div class="mt-12 text-center text-sm text-gray-600">

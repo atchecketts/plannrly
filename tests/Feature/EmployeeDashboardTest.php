@@ -5,17 +5,14 @@ namespace Tests\Feature;
 use App\Enums\LeaveRequestStatus;
 use App\Enums\ShiftStatus;
 use App\Enums\SwapRequestStatus;
-use App\Enums\TimeEntryStatus;
 use App\Models\BusinessRole;
 use App\Models\Department;
-use App\Models\LeaveAllowance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\Location;
 use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
 use App\Models\Tenant;
-use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,10 +58,11 @@ class EmployeeDashboardTest extends TestCase
         $response = $this->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertViewIs('dashboard.employee');
+        // Employees now see the admin dashboard
+        $response->assertViewIs('dashboard.admin');
     }
 
-    public function test_dashboard_shows_today_shift(): void
+    public function test_dashboard_shows_today_shifts(): void
     {
         $this->actingAs($this->employee);
 
@@ -83,122 +81,21 @@ class EmployeeDashboardTest extends TestCase
         $response = $this->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertViewHas('todayShift');
-        $response->assertSee("Today's Shift", false);
+        $response->assertViewHas('todayShifts');
+        $response->assertSee("Today's Schedule", false);
     }
 
-    public function test_dashboard_shows_no_shift_message_when_off(): void
+    public function test_dashboard_shows_stats(): void
     {
         $this->actingAs($this->employee);
 
         $response = $this->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSee('No Shift Today');
+        $response->assertViewHas('stats');
     }
 
-    public function test_dashboard_shows_active_time_entry(): void
-    {
-        $this->actingAs($this->employee);
-
-        $shift = Shift::factory()->create([
-            'tenant_id' => $this->tenant->id,
-            'location_id' => $this->location->id,
-            'department_id' => $this->department->id,
-            'business_role_id' => $this->businessRole->id,
-            'user_id' => $this->employee->id,
-            'date' => today(),
-            'start_time' => '09:00',
-            'end_time' => '17:00',
-            'status' => ShiftStatus::Published,
-        ]);
-
-        TimeEntry::create([
-            'tenant_id' => $this->tenant->id,
-            'user_id' => $this->employee->id,
-            'shift_id' => $shift->id,
-            'clock_in_at' => now()->subHours(2),
-            'status' => TimeEntryStatus::ClockedIn,
-        ]);
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertViewHas('activeTimeEntry');
-        $response->assertSee('Clocked In');
-    }
-
-    public function test_dashboard_shows_week_summary(): void
-    {
-        $this->actingAs($this->employee);
-
-        // Create shifts for this week
-        Shift::factory()->create([
-            'tenant_id' => $this->tenant->id,
-            'location_id' => $this->location->id,
-            'department_id' => $this->department->id,
-            'business_role_id' => $this->businessRole->id,
-            'user_id' => $this->employee->id,
-            'date' => now()->startOfWeek()->addDays(1),
-            'start_time' => '09:00',
-            'end_time' => '17:00',
-            'status' => ShiftStatus::Published,
-        ]);
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertViewHas('weekSummary');
-        $response->assertSee('Scheduled');
-        $response->assertSee('Worked');
-        $response->assertSee('Shifts Left');
-    }
-
-    public function test_dashboard_shows_upcoming_shifts(): void
-    {
-        $this->actingAs($this->employee);
-
-        $shift = Shift::factory()->create([
-            'tenant_id' => $this->tenant->id,
-            'location_id' => $this->location->id,
-            'department_id' => $this->department->id,
-            'business_role_id' => $this->businessRole->id,
-            'user_id' => $this->employee->id,
-            'date' => now()->addDays(2),
-            'start_time' => '09:00',
-            'end_time' => '17:00',
-            'status' => ShiftStatus::Published,
-        ]);
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertViewHas('upcomingShifts');
-        $response->assertSee('Upcoming Shifts');
-    }
-
-    public function test_dashboard_shows_leave_balances(): void
-    {
-        $this->actingAs($this->employee);
-
-        $leaveType = LeaveType::factory()->create(['tenant_id' => $this->tenant->id]);
-        LeaveAllowance::create([
-            'tenant_id' => $this->tenant->id,
-            'user_id' => $this->employee->id,
-            'leave_type_id' => $leaveType->id,
-            'year' => now()->year,
-            'total_days' => 25,
-            'used_days' => 5,
-        ]);
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertViewHas('leaveBalances');
-        $response->assertSee('Leave Balance');
-    }
-
-    public function test_dashboard_shows_pending_requests(): void
+    public function test_dashboard_shows_pending_leave_requests(): void
     {
         $this->actingAs($this->employee);
 
@@ -217,10 +114,10 @@ class EmployeeDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('pendingLeave');
-        $response->assertSee('Pending Requests');
+        $response->assertSee('Pending Leave Requests', false);
     }
 
-    public function test_dashboard_shows_incoming_swap_requests(): void
+    public function test_dashboard_shows_pending_swap_requests(): void
     {
         $this->actingAs($this->employee);
 
@@ -248,7 +145,29 @@ class EmployeeDashboardTest extends TestCase
         $response = $this->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertViewHas('incomingSwaps', 1);
-        $response->assertSee('Incoming Swap Request');
+        $response->assertViewHas('pendingSwaps');
+        $response->assertSee('Shift Swap Requests', false);
+    }
+
+    public function test_dashboard_shows_shifts_by_department(): void
+    {
+        $this->actingAs($this->employee);
+
+        Shift::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $this->location->id,
+            'department_id' => $this->department->id,
+            'business_role_id' => $this->businessRole->id,
+            'user_id' => $this->employee->id,
+            'date' => today(),
+            'start_time' => '09:00',
+            'end_time' => '17:00',
+            'status' => ShiftStatus::Published,
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertViewHas('shiftsByDepartment');
     }
 }

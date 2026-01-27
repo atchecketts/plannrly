@@ -33,11 +33,32 @@ class ScheduleController extends Controller
             $currentDate->addDay();
         }
 
-        $locations = Location::active()->orderBy('name')->get();
-        $departments = Department::with(['location', 'businessRoles'])->active()->orderBy('name')->get();
-        $businessRoles = BusinessRole::with('department')->active()->orderBy('name')->get();
-
         $user = auth()->user();
+
+        // Scope locations/departments/roles based on user's permissions
+        if ($user->isSuperAdmin() || $user->isAdmin()) {
+            $locations = Location::active()->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->orderBy('name')->get();
+        } elseif ($user->isLocationAdmin()) {
+            $managedLocationIds = $user->getManagedLocationIds();
+            $locations = Location::active()->whereIn('id', $managedLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('location_id', $managedLocationIds)->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->whereHas('department', fn ($q) => $q->whereIn('location_id', $managedLocationIds))->orderBy('name')->get();
+        } elseif ($user->isDepartmentAdmin()) {
+            $managedDepartmentIds = $user->getManagedDepartmentIds();
+            $managedLocationIds = Department::whereIn('id', $managedDepartmentIds)->pluck('location_id')->unique()->toArray();
+            $locations = Location::active()->whereIn('id', $managedLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('id', $managedDepartmentIds)->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->whereIn('department_id', $managedDepartmentIds)->orderBy('name')->get();
+        } else {
+            // Employee - show their assigned locations/departments/roles
+            $userDepartmentIds = $user->getDepartmentIds();
+            $userLocationIds = $user->getLocationIds();
+            $locations = Location::active()->whereIn('id', $userLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('id', $userDepartmentIds)->orderBy('name')->get();
+            $businessRoles = $user->businessRoles()->with('department')->active()->orderBy('name')->get();
+        }
 
         // Get shifts for this date range (tenant-scoped automatically)
         $shifts = Shift::with(['user', 'department', 'businessRole'])
@@ -103,11 +124,11 @@ class ScheduleController extends Controller
 
         // Create leave lookup: [user_id][date_string] => leaveRequest
         $leaveLookup = [];
-        foreach ($users as $user) {
-            foreach ($user->leaveRequests as $leave) {
+        foreach ($users as $u) {
+            foreach ($u->leaveRequests as $leave) {
                 $leaveDate = $leave->start_date->copy();
                 while ($leaveDate <= $leave->end_date) {
-                    $leaveLookup[$user->id][$leaveDate->format('Y-m-d')] = $leave;
+                    $leaveLookup[$u->id][$leaveDate->format('Y-m-d')] = $leave;
                     $leaveDate->addDay();
                 }
             }
@@ -130,6 +151,11 @@ class ScheduleController extends Controller
         // Get grouping preference (department or role)
         $groupBy = $request->query('group_by', 'department');
 
+        // Permission data for the view
+        $canEditShifts = ! $user->isEmployee();
+        $editableLocationIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedLocationIds();
+        $editableDepartmentIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedDepartmentIds();
+
         return view('schedule.index', compact(
             'startDate',
             'endDate',
@@ -150,7 +176,10 @@ class ScheduleController extends Controller
             'assignedShifts',
             'unassignedShifts',
             'draftShiftsCount',
-            'groupBy'
+            'groupBy',
+            'canEditShifts',
+            'editableLocationIds',
+            'editableDepartmentIds'
         ));
     }
 
@@ -174,9 +203,30 @@ class ScheduleController extends Controller
             $hours[] = $h;
         }
 
-        $locations = Location::active()->orderBy('name')->get();
-        $departments = Department::with(['location', 'businessRoles'])->active()->orderBy('name')->get();
-        $businessRoles = BusinessRole::with('department')->active()->orderBy('name')->get();
+        // Scope locations/departments/roles based on user's permissions
+        if ($user->isSuperAdmin() || $user->isAdmin()) {
+            $locations = Location::active()->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->orderBy('name')->get();
+        } elseif ($user->isLocationAdmin()) {
+            $managedLocationIds = $user->getManagedLocationIds();
+            $locations = Location::active()->whereIn('id', $managedLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('location_id', $managedLocationIds)->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->whereHas('department', fn ($q) => $q->whereIn('location_id', $managedLocationIds))->orderBy('name')->get();
+        } elseif ($user->isDepartmentAdmin()) {
+            $managedDepartmentIds = $user->getManagedDepartmentIds();
+            $managedLocationIds = Department::whereIn('id', $managedDepartmentIds)->pluck('location_id')->unique()->toArray();
+            $locations = Location::active()->whereIn('id', $managedLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('id', $managedDepartmentIds)->orderBy('name')->get();
+            $businessRoles = BusinessRole::with('department')->active()->whereIn('department_id', $managedDepartmentIds)->orderBy('name')->get();
+        } else {
+            // Employee - show their assigned locations/departments/roles
+            $userDepartmentIds = $user->getDepartmentIds();
+            $userLocationIds = $user->getLocationIds();
+            $locations = Location::active()->whereIn('id', $userLocationIds)->orderBy('name')->get();
+            $departments = Department::with(['location', 'businessRoles'])->active()->whereIn('id', $userDepartmentIds)->orderBy('name')->get();
+            $businessRoles = $user->businessRoles()->with('department')->active()->orderBy('name')->get();
+        }
 
         // Get shifts for this date (tenant-scoped automatically)
         $shifts = Shift::with(['user', 'department', 'businessRole'])
@@ -255,6 +305,11 @@ class ScheduleController extends Controller
         $assignedShiftsCount = $shifts->whereNotNull('user_id')->count();
         $unassignedShiftsCount = $shifts->whereNull('user_id')->count();
 
+        // Permission data for the view
+        $canEditShifts = ! $user->isEmployee();
+        $editableLocationIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedLocationIds();
+        $editableDepartmentIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedDepartmentIds();
+
         return view('schedule.day', compact(
             'selectedDate',
             'hours',
@@ -276,7 +331,10 @@ class ScheduleController extends Controller
             'assignedShiftsCount',
             'unassignedShiftsCount',
             'draftShiftsCount',
-            'groupBy'
+            'groupBy',
+            'canEditShifts',
+            'editableLocationIds',
+            'editableDepartmentIds'
         ));
     }
 
@@ -365,97 +423,5 @@ class ScheduleController extends Controller
             'published_count' => $publishedCount,
             'message' => "{$publishedCount} shift(s) published successfully.",
         ]);
-    }
-
-    public function mobile(Request $request): View
-    {
-        $user = auth()->user();
-
-        // Determine the week to display
-        $startDate = $request->query('start')
-            ? Carbon::parse($request->query('start'))->startOfWeek()
-            : now()->startOfWeek();
-
-        $endDate = $startDate->copy()->endOfWeek();
-
-        // Build the week dates array
-        $weekDates = [];
-        $currentDate = $startDate->copy();
-        while ($currentDate <= $endDate) {
-            $weekDates[] = $currentDate->copy();
-            $currentDate->addDay();
-        }
-
-        // Get shifts for this week
-        $shifts = Shift::with(['user', 'department', 'businessRole'])
-            ->visibleToUser($user)
-            ->whereBetween('date', [$startDate, $endDate])
-            ->orderBy('start_time')
-            ->get();
-
-        // Calculate shift counts per day
-        $shiftCounts = [];
-        foreach ($weekDates as $date) {
-            $dateStr = $date->format('Y-m-d');
-            $shiftCounts[$dateStr] = $shifts->filter(fn ($s) => $s->date->format('Y-m-d') === $dateStr)->count();
-        }
-
-        // Calculate stats
-        $stats = [
-            'total_shifts' => $shifts->count(),
-            'total_hours' => round($shifts->sum('working_hours')),
-            'unassigned' => $shifts->whereNull('user_id')->count(),
-        ];
-
-        // Check if a specific day is selected
-        $selectedDate = $request->query('day')
-            ? Carbon::parse($request->query('day'))
-            : null;
-
-        $dayShifts = collect();
-        if ($selectedDate) {
-            $selectedDateStr = $selectedDate->format('Y-m-d');
-            $dayShifts = $shifts->filter(fn ($s) => $s->date->format('Y-m-d') === $selectedDateStr)->sortBy('start_time');
-        }
-
-        return view('schedule.admin-mobile-index', compact(
-            'startDate',
-            'endDate',
-            'weekDates',
-            'shifts',
-            'shiftCounts',
-            'stats',
-            'selectedDate',
-            'dayShifts'
-        ));
-    }
-
-    public function mobileDay(Request $request): View
-    {
-        $user = auth()->user();
-
-        $selectedDate = $request->query('date')
-            ? Carbon::parse($request->query('date'))
-            : now();
-
-        // Get shifts for this date
-        $shifts = Shift::with(['user', 'department', 'businessRole'])
-            ->visibleToUser($user)
-            ->whereDate('date', $selectedDate)
-            ->orderBy('start_time')
-            ->get();
-
-        // Calculate stats
-        $totalShifts = $shifts->count();
-        $totalHours = $shifts->sum('working_hours');
-        $unassignedShiftsCount = $shifts->whereNull('user_id')->count();
-
-        return view('schedule.admin-mobile-day', compact(
-            'selectedDate',
-            'shifts',
-            'totalShifts',
-            'totalHours',
-            'unassignedShiftsCount'
-        ));
     }
 }

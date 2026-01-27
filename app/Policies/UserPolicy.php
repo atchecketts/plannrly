@@ -16,11 +16,12 @@ class UserPolicy
 
     public function view(User $authUser, User $user): bool
     {
-        if ($authUser->isSuperAdmin()) {
+        // Users can always view themselves
+        if ($authUser->id === $user->id) {
             return true;
         }
 
-        if ($authUser->id === $user->id) {
+        if ($authUser->isSuperAdmin()) {
             return true;
         }
 
@@ -28,9 +29,13 @@ class UserPolicy
             return false;
         }
 
-        return $authUser->isAdmin()
-            || $authUser->isLocationAdmin()
-            || $authUser->isDepartmentAdmin();
+        // Admin can view all users in tenant
+        if ($authUser->isAdmin()) {
+            return true;
+        }
+
+        // LocationAdmin/DepartmentAdmin can only view users in their scope
+        return $authUser->canManageUser($user);
     }
 
     public function create(User $authUser): bool
@@ -43,11 +48,12 @@ class UserPolicy
 
     public function update(User $authUser, User $user): bool
     {
-        if ($authUser->isSuperAdmin()) {
+        // Users can always update themselves
+        if ($authUser->id === $user->id) {
             return true;
         }
 
-        if ($authUser->id === $user->id) {
+        if ($authUser->isSuperAdmin()) {
             return true;
         }
 
@@ -55,13 +61,18 @@ class UserPolicy
             return false;
         }
 
-        return $authUser->isAdmin()
-            || $authUser->isLocationAdmin()
-            || $authUser->isDepartmentAdmin();
+        // Admin can update all users in tenant
+        if ($authUser->isAdmin()) {
+            return true;
+        }
+
+        // LocationAdmin/DepartmentAdmin can only update users in their scope
+        return $authUser->canManageUser($user);
     }
 
     public function delete(User $authUser, User $user): bool
     {
+        // Cannot delete yourself
         if ($authUser->id === $user->id) {
             return false;
         }
@@ -74,6 +85,7 @@ class UserPolicy
             return false;
         }
 
+        // Only Admin can delete users
         return $authUser->isAdmin();
     }
 
@@ -87,6 +99,16 @@ class UserPolicy
             return false;
         }
 
-        return $authUser->isAdmin() || $authUser->isLocationAdmin();
+        // Admin can assign roles to anyone in tenant
+        if ($authUser->isAdmin()) {
+            return true;
+        }
+
+        // LocationAdmin can assign roles to users in their locations
+        if ($authUser->isLocationAdmin()) {
+            return $authUser->canManageUser($user);
+        }
+
+        return false;
     }
 }

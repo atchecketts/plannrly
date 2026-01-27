@@ -95,18 +95,18 @@
                                 <p class="text-sm text-gray-500">{{ $leave->leaveType->name }} &bull; {{ $leave->start_date->format('M d') }}-{{ $leave->end_date->format('d') }}</p>
                             </div>
                             <div class="flex gap-2">
-                                <form action="{{ route('leave-requests.approve', $leave) }}" method="POST" class="inline">
+                                <form action="{{ route('leave-requests.review', $leave) }}" method="POST" class="inline">
                                     @csrf
-                                    @method('PATCH')
+                                    <input type="hidden" name="action" value="approve">
                                     <button type="submit" class="p-2 text-green-500 hover:bg-green-500/10 rounded-lg transition-colors" title="Approve">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </button>
                                 </form>
-                                <form action="{{ route('leave-requests.reject', $leave) }}" method="POST" class="inline">
+                                <form action="{{ route('leave-requests.review', $leave) }}" method="POST" class="inline">
                                     @csrf
-                                    @method('PATCH')
+                                    <input type="hidden" name="action" value="reject">
                                     <button type="submit" class="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Reject">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -164,7 +164,6 @@
                             <div class="flex gap-1">
                                 <form action="{{ route('shift-swaps.approve', $swap) }}" method="POST" class="inline">
                                     @csrf
-                                    @method('PATCH')
                                     <button type="submit" class="p-1.5 text-green-500 hover:bg-green-500/10 rounded-lg transition-colors" title="Approve">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -173,7 +172,6 @@
                                 </form>
                                 <form action="{{ route('shift-swaps.reject', $swap) }}" method="POST" class="inline">
                                     @csrf
-                                    @method('PATCH')
                                     <button type="submit" class="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Reject">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

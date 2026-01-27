@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\LeaveRequestStatus;
 use App\Enums\ShiftStatus;
 use App\Enums\SwapRequestStatus;
-use App\Models\LeaveAllowance;
 use App\Models\LeaveRequest;
 use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
-use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\View\View;
 
@@ -40,9 +38,30 @@ class DashboardController extends Controller
 
     protected function superAdminDashboard(): View
     {
-        // Super admins use the same mobile dashboard as regular admins
-        // They see all data for their tenant without filtering
-        return $this->adminDashboard();
+        $stats = [
+            'total_tenants' => \App\Models\Tenant::count(),
+            'active_tenants' => \App\Models\Tenant::where('is_active', true)->count(),
+            'total_users' => User::count(),
+            'active_users' => User::where('is_active', true)->count(),
+            'new_tenants_this_month' => \App\Models\Tenant::whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->count(),
+            'new_users_this_month' => User::whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->count(),
+        ];
+
+        $recentTenants = \App\Models\Tenant::withCount('users')
+            ->latest()
+            ->take(10)
+            ->get();
+
+        $recentUsers = User::with('tenant')
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return view('dashboard.super-admin', compact('stats', 'recentTenants', 'recentUsers'));
     }
 
     protected function adminDashboard(?int $locationId = null, ?int $departmentId = null): View
@@ -193,91 +212,7 @@ class DashboardController extends Controller
 
     protected function employeeDashboard(): View
     {
-        $user = auth()->user();
-        $user->load(['businessRoles.department']);
-
-        // Today's shift with time entry
-        $todayShift = Shift::with(['location', 'department', 'businessRole', 'timeEntry'])
-            ->visibleToUser($user)
-            ->where('user_id', $user->id)
-            ->whereDate('date', today())
-            ->first();
-
-        // Active time entry (if clocked in)
-        $activeTimeEntry = TimeEntry::where('user_id', $user->id)
-            ->active()
-            ->first();
-
-        // Week summary
-        $weekStart = now()->startOfWeek();
-        $weekEnd = now()->endOfWeek();
-
-        $weekShifts = Shift::visibleToUser($user)
-            ->where('user_id', $user->id)
-            ->whereBetween('date', [$weekStart, $weekEnd])
-            ->get();
-
-        $scheduledHours = $weekShifts->sum('working_hours');
-
-        $workedMinutes = TimeEntry::where('user_id', $user->id)
-            ->whereBetween('clock_in_at', [$weekStart, $weekEnd])
-            ->get()
-            ->sum('total_worked_minutes');
-        $workedHours = round($workedMinutes / 60, 1);
-
-        $shiftsRemaining = $weekShifts->filter(fn ($shift) => $shift->date >= today())->count();
-
-        // Upcoming shifts (excluding today)
-        $upcomingShifts = Shift::with(['location', 'department', 'businessRole'])
-            ->visibleToUser($user)
-            ->where('user_id', $user->id)
-            ->whereDate('date', '>', today())
-            ->orderBy('date')
-            ->orderBy('start_time')
-            ->take(5)
-            ->get();
-
-        // Leave balances for current year
-        $leaveBalances = LeaveAllowance::with('leaveType')
-            ->where('user_id', $user->id)
-            ->forYear(now()->year)
-            ->get();
-
-        // Pending requests
-        $pendingLeave = LeaveRequest::with('leaveType')
-            ->where('user_id', $user->id)
-            ->where('status', LeaveRequestStatus::Requested)
-            ->latest()
-            ->take(3)
-            ->get();
-
-        $pendingSwaps = ShiftSwapRequest::with(['requestingShift.department', 'requestingShift.businessRole'])
-            ->where('requesting_user_id', $user->id)
-            ->where('status', SwapRequestStatus::Pending)
-            ->latest()
-            ->take(3)
-            ->get();
-
-        // Incoming swap requests
-        $incomingSwaps = ShiftSwapRequest::with(['requestingShift.user', 'requestingShift.department'])
-            ->where('target_user_id', $user->id)
-            ->where('status', SwapRequestStatus::Pending)
-            ->count();
-
-        return view('dashboard.employee', [
-            'user' => $user,
-            'todayShift' => $todayShift,
-            'activeTimeEntry' => $activeTimeEntry,
-            'weekSummary' => [
-                'scheduled_hours' => round($scheduledHours, 1),
-                'worked_hours' => $workedHours,
-                'shifts_remaining' => $shiftsRemaining,
-            ],
-            'upcomingShifts' => $upcomingShifts,
-            'leaveBalances' => $leaveBalances,
-            'pendingLeave' => $pendingLeave,
-            'pendingSwaps' => $pendingSwaps,
-            'incomingSwaps' => $incomingSwaps,
-        ]);
+        // Employee-specific dashboard removed - show admin dashboard for now
+        return $this->adminDashboard();
     }
 }

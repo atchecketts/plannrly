@@ -46,7 +46,36 @@ class ShiftController extends Controller
 
     public function update(UpdateShiftRequest $request, Shift $shift): RedirectResponse|JsonResponse
     {
-        $shift->update($request->validated());
+        $data = $request->validated();
+
+        // If shift is published and movement fields are changing, revert to draft
+        if ($shift->status === ShiftStatus::Published) {
+            $movementFields = ['date', 'start_time', 'end_time', 'user_id'];
+            $isMoving = false;
+
+            foreach ($movementFields as $field) {
+                if (array_key_exists($field, $data)) {
+                    $currentValue = $shift->{$field};
+                    $newValue = $data[$field];
+
+                    // Normalize for comparison (handle Carbon objects)
+                    if ($currentValue instanceof \Carbon\Carbon) {
+                        $currentValue = $currentValue->format($field === 'date' ? 'Y-m-d' : 'H:i');
+                    }
+
+                    if ($currentValue != $newValue) {
+                        $isMoving = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isMoving) {
+                $data['status'] = ShiftStatus::Draft;
+            }
+        }
+
+        $shift->update($data);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -83,7 +112,14 @@ class ShiftController extends Controller
             'user_id' => ['nullable', 'exists:users,id'],
         ]);
 
-        $shift->update(['user_id' => $request->input('user_id')]);
+        $data = ['user_id' => $request->input('user_id')];
+
+        // If shift is published and user is changing, revert to draft
+        if ($shift->status === ShiftStatus::Published && $shift->user_id != $data['user_id']) {
+            $data['status'] = ShiftStatus::Draft;
+        }
+
+        $shift->update($data);
 
         if ($request->wantsJson()) {
             return response()->json([

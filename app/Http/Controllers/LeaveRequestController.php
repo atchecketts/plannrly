@@ -64,11 +64,8 @@ class LeaveRequestController extends Controller
             $leaveRequest->submit();
         }
 
-        $user = auth()->user();
-        $route = $user->isEmployee() ? 'my-leave.index' : 'leave-requests.index';
-
         return redirect()
-            ->route($route)
+            ->route('leave-requests.index')
             ->with('success', 'Leave request created successfully.');
     }
 
@@ -118,70 +115,5 @@ class LeaveRequestController extends Controller
         return redirect()
             ->route('leave-requests.index')
             ->with('success', 'Leave request cancelled.');
-    }
-
-    public function myCreate(): View
-    {
-        $leaveTypes = LeaveType::active()
-            ->forTenant(auth()->user()->tenant_id)
-            ->orderBy('name')
-            ->get();
-
-        return view('my-leave.create', compact('leaveTypes'));
-    }
-
-    public function myRequests(): View
-    {
-        $user = auth()->user();
-
-        $leaveRequests = LeaveRequest::with(['leaveType', 'reviewedBy'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->get();
-
-        $pendingRequests = $leaveRequests->filter(
-            fn ($request) => $request->status === LeaveRequestStatus::Requested
-        );
-
-        $upcomingApproved = LeaveRequest::with(['leaveType'])
-            ->where('user_id', $user->id)
-            ->where('status', LeaveRequestStatus::Approved)
-            ->where('start_date', '>=', today())
-            ->orderBy('start_date')
-            ->get();
-
-        return view('my-leave.index', [
-            'leaveRequests' => $leaveRequests,
-            'pendingRequests' => $pendingRequests,
-            'upcomingApproved' => $upcomingApproved,
-        ]);
-    }
-
-    public function mobile(): View
-    {
-        $user = auth()->user();
-
-        $status = request()->query('status', 'pending');
-
-        $query = LeaveRequest::with(['user', 'leaveType', 'reviewedBy'])
-            ->orderByDesc('created_at');
-
-        if ($status === 'pending') {
-            $query->where('status', LeaveRequestStatus::Requested);
-        } elseif ($status === 'approved') {
-            $query->where('status', LeaveRequestStatus::Approved);
-        } elseif ($status === 'rejected') {
-            $query->where('status', LeaveRequestStatus::Rejected);
-        }
-
-        $leaveRequests = $query->paginate(15);
-
-        $pendingCount = LeaveRequest::where('status', LeaveRequestStatus::Requested)->count();
-
-        return view('leave-requests.admin-mobile-index', [
-            'leaveRequests' => $leaveRequests,
-            'status' => $status,
-            'pendingCount' => $pendingCount,
-        ]);
     }
 }

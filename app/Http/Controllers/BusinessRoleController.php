@@ -23,23 +23,6 @@ class BusinessRoleController extends Controller
         return view('business-roles.index', compact('businessRoles'));
     }
 
-    public function mobile(): View
-    {
-        $this->authorize('viewAny', BusinessRole::class);
-
-        $businessRoles = BusinessRole::with('department.location')
-            ->withCount('users')
-            ->orderBy('name')
-            ->get();
-
-        $stats = [
-            'active' => $businessRoles->where('is_active', true)->count(),
-            'inactive' => $businessRoles->where('is_active', false)->count(),
-        ];
-
-        return view('business-roles.admin-mobile-index', compact('businessRoles', 'stats'));
-    }
-
     public function create(): View
     {
         $this->authorize('create', BusinessRole::class);
