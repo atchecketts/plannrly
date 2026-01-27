@@ -354,4 +354,121 @@ class ShiftControllerTest extends TestCase
         $shift = Shift::latest()->first();
         $this->assertEquals('Special instructions for this shift', $shift->notes);
     }
+
+    public function test_moving_published_shift_reverts_to_draft_status(): void
+    {
+        $this->actingAs($this->admin);
+
+        $shift = Shift::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $this->location->id,
+            'department_id' => $this->department->id,
+            'business_role_id' => $this->businessRole->id,
+            'user_id' => $this->employee->id,
+            'date' => '2024-01-15',
+            'start_time' => '09:00',
+            'end_time' => '17:00',
+            'status' => ShiftStatus::Published,
+        ]);
+
+        $response = $this->putJson(route('shifts.update', $shift), [
+            'date' => '2024-01-16',
+        ]);
+
+        $response->assertOk();
+
+        $shift->refresh();
+        $this->assertEquals('2024-01-16', $shift->date->format('Y-m-d'));
+        $this->assertEquals(ShiftStatus::Draft, $shift->status);
+    }
+
+    public function test_changing_published_shift_time_reverts_to_draft_status(): void
+    {
+        $this->actingAs($this->admin);
+
+        $shift = Shift::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $this->location->id,
+            'department_id' => $this->department->id,
+            'business_role_id' => $this->businessRole->id,
+            'user_id' => $this->employee->id,
+            'date' => '2024-01-15',
+            'start_time' => '09:00',
+            'end_time' => '17:00',
+            'status' => ShiftStatus::Published,
+        ]);
+
+        $response = $this->putJson(route('shifts.update', $shift), [
+            'start_time' => '10:00',
+            'end_time' => '18:00',
+        ]);
+
+        $response->assertOk();
+
+        $shift->refresh();
+        $this->assertEquals('10:00', $shift->start_time->format('H:i'));
+        $this->assertEquals('18:00', $shift->end_time->format('H:i'));
+        $this->assertEquals(ShiftStatus::Draft, $shift->status);
+    }
+
+    public function test_reassigning_published_shift_reverts_to_draft_status(): void
+    {
+        $this->actingAs($this->admin);
+
+        $anotherEmployee = User::factory()->create(['tenant_id' => $this->tenant->id]);
+        $anotherEmployee->businessRoles()->attach($this->businessRole->id, ['is_primary' => true]);
+
+        $shift = Shift::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $this->location->id,
+            'department_id' => $this->department->id,
+            'business_role_id' => $this->businessRole->id,
+            'user_id' => $this->employee->id,
+            'date' => '2024-01-15',
+            'start_time' => '09:00',
+            'end_time' => '17:00',
+            'status' => ShiftStatus::Published,
+        ]);
+
+        $response = $this->putJson(route('shifts.update', $shift), [
+            'user_id' => $anotherEmployee->id,
+        ]);
+
+        $response->assertOk();
+
+        $shift->refresh();
+        $this->assertEquals($anotherEmployee->id, $shift->user_id);
+        $this->assertEquals(ShiftStatus::Draft, $shift->status);
+    }
+
+    public function test_updating_non_movement_fields_keeps_published_status(): void
+    {
+        $this->actingAs($this->admin);
+
+        $shift = Shift::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $this->location->id,
+            'department_id' => $this->department->id,
+            'business_role_id' => $this->businessRole->id,
+            'user_id' => $this->employee->id,
+            'date' => '2024-01-15',
+            'start_time' => '09:00',
+            'end_time' => '17:00',
+            'status' => ShiftStatus::Published,
+            'notes' => null,
+            'break_duration_minutes' => 0,
+        ]);
+
+        $response = $this->putJson(route('shifts.update', $shift), [
+            'notes' => 'Updated notes for the shift',
+            'break_duration_minutes' => 30,
+        ]);
+
+        $response->assertOk();
+
+        $shift->refresh();
+        $this->assertEquals('Updated notes for the shift', $shift->notes);
+        $this->assertEquals(30, $shift->break_duration_minutes);
+        $this->assertEquals(ShiftStatus::Published, $shift->status);
+    }
 }

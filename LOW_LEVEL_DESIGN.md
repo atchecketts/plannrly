@@ -2118,202 +2118,436 @@ Add to crontab:
 | 1.5.0 | 2025-01-25 | Claude | Mobile Implementation Phase 2: Enhanced Employee Dashboard |
 | 1.6.0 | 2025-01-25 | Claude | Mobile Implementation Phases 3-8: Complete mobile functionality |
 | 1.6.1 | 2025-01-25 | Claude | Bug fixes: Fixed User-Department relationships, corrected SwapRequestStatus enum usage |
+| 2.0.0 | 2025-01-27 | Claude | Major refactor: Removed mobile-specific views, added day view drag-and-drop/resize, published shift handling, SuperAdmin features |
 
 ---
 
 ---
 
-## 11. Mobile Implementation
+## 11. Day View Drag-and-Drop and Resize
 
-### 11.1 Mobile Layout Foundation (Phase 1)
+### 11.1 Overview
 
-The mobile interface provides a touch-friendly, responsive experience for employees using smartphones. The layout uses a dedicated mobile layout component with bottom navigation.
+The day view (`/schedule/day`) provides interactive shift management with mouse-based drag-and-drop for moving shifts and resize handles for adjusting shift times. Unlike the week view which uses HTML5 Drag and Drop API, the day view uses mouse events for precise positioning.
 
-**Mobile Layout Component:**
+### 11.2 Day View Timeline Structure
 
-```php
-// resources/views/components/layouts/mobile.blade.php
-@props(['title', 'active' => 'home', 'showHeader' => true, 'headerTitle' => null])
+**Timeline Layout:**
+```html
+<div class="timeline-container relative" style="height: 48px;">
+    <!-- Timeline grid with hour markers -->
+    <div class="timeline-grid absolute inset-0">
+        @for ($hour = $dayStartHour; $hour <= $dayEndHour; $hour++)
+            <div class="hour-marker" style="left: {{ (($hour - $dayStartHour) / $numHours) * 100 }}%"></div>
+        @endfor
+    </div>
+
+    <!-- Shift bars positioned absolutely -->
+    <div class="shift-bar absolute" style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%;">
+        <div class="resize-handle-left"></div>
+        <span class="shift-times">{{ $startTime }} - {{ $endTime }}</span>
+        <div class="resize-handle-right"></div>
+    </div>
+</div>
 ```
 
-**Key Features:**
-- Maximum width container (`max-w-md`) for optimal mobile viewing
-- Viewport meta tag with `maximum-scale=1.0, user-scalable=no` for PWA-like behavior
-- Safe area inset support for devices with notches
-- Bottom navigation with 5 main sections
-- Branded header with user avatar and greeting
+**Position Calculation:**
+```javascript
+// Calculate percentage position from times
+const dayStartHour = {{ $dayStartHour }};  // From TenantSettings (default: 6)
+const dayEndHour = {{ $dayEndHour }};      // From TenantSettings (default: 22)
+const numHours = dayEndHour - dayStartHour;
 
-### 11.2 Mobile Routes
+// Convert time to percentage
+function timeToPercent(timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const totalMinutes = (hours - dayStartHour) * 60 + minutes;
+    return (totalMinutes / (numHours * 60)) * 100;
+}
+
+const leftPercent = timeToPercent(startTime);
+const rightPercent = timeToPercent(endTime);
+const widthPercent = rightPercent - leftPercent;
+```
+
+### 11.3 Mouse-Based Drag Implementation
+
+**State Management (Alpine.js):**
+```javascript
+dragState: {
+    active: false,
+    shiftId: null,
+    shiftElement: null,
+    initialMouseX: 0,
+    initialLeft: 0,
+    initialWidth: 0,
+    containerRect: null,
+    originalUserId: null,
+    currentTargetRow: null
+}
+```
+
+**Event Handlers:**
+
+| Handler | Trigger | Purpose |
+|---------|---------|---------|
+| `handleDragStart(e, shiftId)` | mousedown on shift | Initialize drag state, store original position |
+| `handleDragMove(e)` | mousemove (global) | Update shift position, detect target row |
+| `handleDragEnd(e)` | mouseup (global) | Calculate new time/user, call API |
+
+**Drag Flow:**
+1. **Start**: Store initial mouse position, shift position, container bounds
+2. **Move**: Calculate delta X, update shift's left position, detect row under cursor
+3. **End**: Convert final position to time, determine target user, call API
+
+**Row Detection During Drag:**
+```javascript
+// Find which user row the cursor is over
+const rows = document.querySelectorAll('[data-user-id]');
+let targetUserId = this.dragState.originalUserId;
+
+rows.forEach(row => {
+    const rowRect = row.getBoundingClientRect();
+    if (event.clientY >= rowRect.top && event.clientY <= rowRect.bottom) {
+        targetUserId = row.dataset.userId || null;
+    }
+});
+```
+
+### 11.4 Resize Functionality
+
+**Resize Handles:**
+```html
+<div class="shift-bar relative">
+    <div class="resize-handle-left absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize"></div>
+    <!-- Shift content -->
+    <div class="resize-handle-right absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"></div>
+</div>
+```
+
+**Resize State:**
+```javascript
+resizeState: {
+    active: false,
+    edge: null,        // 'left' or 'right'
+    shiftId: null,
+    shiftElement: null,
+    initialMouseX: 0,
+    initialLeft: 0,
+    initialWidth: 0,
+    containerRect: null
+}
+```
+
+**Resize Behavior:**
+- **Left edge**: Adjusts start time, shift bar moves left/right
+- **Right edge**: Adjusts end time, shift bar width changes
+- **15-minute snapping**: Times snap to nearest 15-minute interval
+
+**Time Snapping:**
+```javascript
+function snapToQuarterHour(minutes) {
+    return Math.round(minutes / 15) * 15;
+}
+
+// Convert percentage back to time
+function percentToTime(percent) {
+    const totalMinutes = (percent / 100) * numHours * 60;
+    const snappedMinutes = snapToQuarterHour(totalMinutes + dayStartHour * 60);
+    const hours = Math.floor(snappedMinutes / 60);
+    const mins = snappedMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
+```
+
+### 11.5 CSS Classes
+
+```css
+/* Resize handles - visible on hover */
+.resize-handle-left,
+.resize-handle-right {
+    @apply opacity-0 transition-opacity duration-150;
+}
+
+.shift-bar:hover .resize-handle-left,
+.shift-bar:hover .resize-handle-right {
+    @apply opacity-100 bg-white/30;
+}
+
+/* Dragging state */
+.shift-bar.dragging {
+    @apply opacity-75 ring-2 ring-purple-500;
+}
+
+/* Target row highlight during drag */
+.timeline-row.drag-target {
+    @apply bg-purple-500/10;
+}
+```
+
+---
+
+## 12. Published Shift Handling
+
+### 12.1 Overview
+
+When shifts are moved (via drag-and-drop, resize, or modal edit), the system checks if the shift was published and handles it appropriately. Published shifts that are moved revert to draft status, requiring re-publication.
+
+### 12.2 Workflow Order
+
+The validation and warning flow follows this order:
+
+1. **Clash Check First**: Before applying changes, the API validates for overlapping shifts
+2. **Apply Changes**: If no clash, the shift is updated
+3. **Status Reversion**: If shift was published and moved, status reverts to draft
+4. **Warning Modal**: User is shown a warning that they'll need to republish
+
+**Rationale:** Checking clashes before showing the published warning prevents showing a warning for a move that would fail anyway.
+
+### 12.3 Backend Implementation
+
+**ShiftController::update():**
+```php
+public function update(UpdateShiftRequest $request, Shift $shift): RedirectResponse|JsonResponse
+{
+    $data = $request->validated();
+
+    // If shift is published and movement fields are changing, revert to draft
+    if ($shift->status === ShiftStatus::Published) {
+        $movementFields = ['date', 'start_time', 'end_time', 'user_id'];
+        $isMoving = false;
+
+        foreach ($movementFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $currentValue = $shift->{$field};
+                $newValue = $data[$field];
+
+                // Normalize for comparison (handle Carbon objects)
+                if ($currentValue instanceof \Carbon\Carbon) {
+                    $currentValue = $currentValue->format($field === 'date' ? 'Y-m-d' : 'H:i');
+                }
+
+                if ($currentValue != $newValue) {
+                    $isMoving = true;
+                    break;
+                }
+            }
+        }
+
+        if ($isMoving) {
+            $data['status'] = ShiftStatus::Draft;
+        }
+    }
+
+    $shift->update($data);
+    // ... rest of method
+}
+```
+
+**Movement Fields:**
+| Field | Description |
+|-------|-------------|
+| `date` | Shift date |
+| `start_time` | Shift start time |
+| `end_time` | Shift end time |
+| `user_id` | Assigned employee |
+
+**Non-Movement Fields (don't trigger reversion):**
+- `notes`
+- `break_duration_minutes`
+- `location_id`, `department_id`, `business_role_id`
+
+### 12.4 Frontend Warning Modal
+
+**After Successful Move:**
+```javascript
+// In handleDragEnd or handleResizeEnd
+const wasPublished = shiftData.status === 'published';
+
+// Make API call...
+const response = await fetch(`/shifts/${shiftId}`, { ... });
+
+if (response.ok && wasPublished) {
+    this.showConfirm(
+        'Shift Moved',
+        'This shift is already published. If you move it you will need to publish it again.',
+        () => window.location.reload(),
+        () => window.location.reload()
+    );
+} else {
+    window.location.reload();
+}
+```
+
+**Important: Clear Drag State Before Async:**
+```javascript
+async handleDragEnd(event) {
+    if (!this.dragState.active) return;
+
+    // CRITICAL: Stop tracking mouse immediately
+    this.dragState.active = false;
+
+    // Now safe to do async operations
+    // (prevents shift from following cursor while modal is shown)
+}
+```
+
+### 12.5 Test Coverage
+
+| Test | Description |
+|------|-------------|
+| `test_moving_published_shift_reverts_to_draft` | Changing date reverts to draft |
+| `test_updating_non_movement_fields_keeps_published_status` | Changing notes doesn't revert |
+| `test_moving_draft_shift_stays_draft` | Draft shifts remain draft |
+| `test_reassigning_published_shift_reverts_to_draft` | Changing user_id reverts |
+
+---
+
+## 13. SuperAdmin Features
+
+### 13.1 Overview
+
+SuperAdmin is a platform-level role for Plannrly staff to manage tenants, users, and support operations. SuperAdmins have no tenant_id and can access all tenant data.
+
+### 13.2 Routes
 
 | Method | URI | Controller | Description |
 |--------|-----|------------|-------------|
-| GET | /my-shifts | MyShiftsController@index | View employee's weekly shifts |
-| GET | /time-clock | TimeClockController@index | Time clock interface |
-| POST | /time-clock/clock-in | TimeClockController@clockIn | Clock in for shift |
-| POST | /time-clock/clock-out | TimeClockController@clockOut | Clock out from shift |
-| POST | /time-clock/start-break | TimeClockController@startBreak | Start break |
-| POST | /time-clock/end-break | TimeClockController@endBreak | End break |
-| GET | /my-swaps | MySwapsController@index | View swap requests |
-| GET | /my-swaps/create/{shift} | MySwapsController@create | Create swap request form |
-| POST | /my-swaps | MySwapsController@store | Submit swap request |
-| GET | /profile | ProfileController@show | View/edit profile |
-| PUT | /profile | ProfileController@update | Update profile |
-| GET | /my-leave | LeaveRequestController@myRequests | View employee's leave requests |
+| GET | /super-admin/dashboard | SuperAdmin\DashboardController@index | SuperAdmin dashboard |
+| GET | /super-admin/tenants | SuperAdmin\TenantController@index | List all tenants |
+| GET | /super-admin/tenants/{tenant} | SuperAdmin\TenantController@show | View tenant details |
+| GET | /super-admin/users | SuperAdmin\UserController@index | List all users across tenants |
+| POST | /super-admin/impersonate/{user} | SuperAdmin\ImpersonationController@start | Start impersonating user |
+| DELETE | /super-admin/impersonate | SuperAdmin\ImpersonationController@stop | Stop impersonation |
 
-### 11.3 Mobile Controllers
+### 13.3 Middleware
 
-#### MyShiftsController
-
-Displays employee's shifts grouped by date for the current week with navigation.
-
+**EnsureSuperAdmin Middleware:**
 ```php
-class MyShiftsController extends Controller
+class EnsureSuperAdmin
 {
-    public function index(Request $request): View
+    public function handle(Request $request, Closure $next): Response
     {
-        // Uses visibleToUser() scope - only shows published shifts
-        // Groups shifts by date
-        // Calculates total hours and shift count for week
+        if (!$request->user()?->isSuperAdmin()) {
+            abort(403, 'Access denied. Super Admin privileges required.');
+        }
+
+        return $next($request);
     }
 }
 ```
 
-**Query Parameters:**
-- `start` - Start date for week view (default: start of current week)
-
-#### TimeClockController
-
-Handles time tracking with clock in/out and break management.
-
+**Route Registration:**
 ```php
-class TimeClockController extends Controller
+Route::prefix('super-admin')
+    ->middleware(['auth', 'super_admin'])
+    ->group(function () {
+        // SuperAdmin routes
+    });
+```
+
+### 13.4 User Impersonation
+
+Allows SuperAdmins to log in as any user to debug issues or provide support.
+
+**Start Impersonation:**
+```php
+public function start(User $user): RedirectResponse
 {
-    public function index(): View
-    {
-        // Shows today's shift and active time entry
-        // Displays worked minutes today
-    }
+    // Store original user ID in session
+    session(['impersonating_from' => auth()->id()]);
 
-    public function clockIn(Request $request): RedirectResponse|JsonResponse
-    {
-        // Creates TimeEntry with ClockedIn status
-        // Validates: not already clocked in, has shift today
-    }
+    // Login as target user
+    Auth::login($user);
 
-    public function clockOut(Request $request): RedirectResponse|JsonResponse
-    {
-        // Updates TimeEntry with ClockedOut status
-        // Validates: is currently clocked in
-    }
-
-    public function startBreak(Request $request): RedirectResponse|JsonResponse
-    {
-        // Updates TimeEntry to OnBreak status
-        // Validates: is clocked in (not on break)
-    }
-
-    public function endBreak(Request $request): RedirectResponse|JsonResponse
-    {
-        // Updates TimeEntry back to ClockedIn status
-        // Calculates and records break duration
-    }
+    return redirect()->route('dashboard')
+        ->with('info', "Now impersonating {$user->full_name}");
 }
 ```
 
-**Dual Response Format:**
-All clock actions support both redirect (form) and JSON (API) responses based on request type.
-
-#### MySwapsController
-
-Handles employee-initiated shift swap requests.
-
+**Stop Impersonation:**
 ```php
-class MySwapsController extends Controller
+public function stop(): RedirectResponse
 {
-    public function index(): View
-    {
-        // Outgoing: Requests I made
-        // Incoming: Requests targeting me (pending only)
+    $originalId = session('impersonating_from');
+
+    if ($originalId) {
+        $originalUser = User::find($originalId);
+        Auth::login($originalUser);
+        session()->forget('impersonating_from');
     }
 
-    public function create(Shift $shift): View
-    {
-        // Shows swap form for employee's own shift
-        // Lists available users with matching business role
-    }
-
-    public function store(Request $request): RedirectResponse
-    {
-        // Creates ShiftSwapRequest
-        // Validates: shift belongs to user
-    }
+    return redirect()->route('super-admin.dashboard')
+        ->with('success', 'Impersonation ended');
 }
 ```
 
-#### ProfileController
-
-Employee profile viewing and editing.
-
-```php
-class ProfileController extends Controller
-{
-    public function show(): View
-    {
-        // Displays user info with departments and roles
-    }
-
-    public function update(Request $request): RedirectResponse
-    {
-        // Updates name, email, phone
-        // Optional password change with current password verification
-    }
-}
+**Impersonation Banner:**
+When impersonating, a banner is shown at the top of every page:
+```html
+@if(session('impersonating_from'))
+<div class="bg-amber-500 text-black text-center py-2">
+    <span>Impersonating {{ auth()->user()->full_name }}</span>
+    <form action="{{ route('super-admin.impersonate.stop') }}" method="POST" class="inline">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="underline ml-4">Stop Impersonating</button>
+    </form>
+</div>
+@endif
 ```
 
-### 11.4 Bottom Navigation Component
+### 13.5 Dashboard Metrics
 
+The SuperAdmin dashboard displays:
+- Total tenant count
+- Total user count across all tenants
+- Active users (last 30 days)
+- Recent registrations
+- System health indicators
+
+### 13.6 Bypassing Tenant Scope
+
+SuperAdmin queries bypass the TenantScope:
 ```php
-// resources/views/components/bottom-nav.blade.php
-@props(['active' => 'home'])
+// In SuperAdmin controllers
+User::withoutGlobalScope(TenantScope::class)->get();
+Tenant::with('users')->get();
 ```
 
-**Navigation Items:**
+---
 
-| Item | Route | Active State |
-|------|-------|--------------|
-| Home | dashboard | `active === 'home'` |
-| Shifts | my-shifts.index | `active === 'shifts'` |
-| Clock | time-clock.index | Always prominent (center) |
-| Swap | my-swaps.index | `active === 'swaps'` |
-| Profile | profile.show | `active === 'profile'` |
+## 14. Responsive Design (v2.0)
 
-**Clock Button:**
-The center clock button has a floating design with a larger hit area:
-- `-mt-8` negative margin to float above nav bar
-- Larger icon size (`w-7 h-7`)
-- Accent background (`bg-brand-600`)
-- Border matching page background (`border-gray-950`)
+### 14.1 Architecture Change
 
-### 11.5 Mobile View Files
+In version 2.0, the separate mobile layouts and controllers were removed in favor of a unified responsive design. The main `app.blade.php` layout now handles all screen sizes.
 
-| View | Description |
-|------|-------------|
-| `my-shifts/index.blade.php` | Weekly shift calendar with day cards |
-| `time-clock/index.blade.php` | Clock in/out interface with live time |
-| `my-swaps/index.blade.php` | Incoming and outgoing swap requests |
-| `my-swaps/create.blade.php` | Create swap request form |
-| `profile/show.blade.php` | Profile view and edit form |
-| `my-leave/index.blade.php` | Leave requests and balances |
+**Removed Files:**
+- `app/Http/Controllers/MyShiftsController.php`
+- `app/Http/Controllers/MySwapsController.php`
+- `app/Http/Controllers/TimeClockController.php`
+- `app/Http/Controllers/ProfileController.php`
+- `resources/views/components/layouts/mobile.blade.php`
+- `resources/views/components/bottom-nav.blade.php`
+- `resources/views/my-shifts/*`
+- `resources/views/my-swaps/*`
+- `resources/views/time-clock/*`
+- `resources/views/profile/*`
 
-### 11.6 Test Coverage
+**Removed Routes:**
+- `/my-shifts`
+- `/time-clock` and related clock in/out routes
+- `/my-swaps`
+- `/profile`
 
-| Test Class | Test Cases |
-|------------|------------|
-| MyShiftsControllerTest | View shifts, week navigation, draft visibility, tenant isolation |
-| EmployeeDashboardTest | Today's shift, week summary, leave balances, pending requests |
-| TimeClockControllerTest | Clock in/out, break management, validation, JSON responses |
-| MySwapsControllerTest | View swaps, create requests, authorization |
-| ProfileControllerTest | View profile, update info, change password, validation |
+### 14.2 Current Approach
+
+All views now use responsive Tailwind CSS classes for mobile support:
+- Sidebar collapses on mobile (hidden by default, toggle button)
+- Tables become scrollable horizontally
+- Grid layouts adjust columns based on screen width
+- Touch-friendly button sizes on smaller screens
 
 ---
 
