@@ -59,6 +59,31 @@ Define the roles that make sense for your business, complete with:
 - Color-coded visual identification for easy schedule reading
 - Role-based shift templates for faster scheduling
 
+### Scheduling Delegation
+
+As your business grows, you can't do everything yourself. Plannrly allows you to delegate scheduling responsibilities to the right people at the right level:
+
+**Delegate to Location Administrators:**
+- Assign store managers or site supervisors as Location Administrators
+- They gain full scheduling control for their specific location
+- They can create, edit, and publish shifts for employees at their site
+- They can approve leave requests and shift swaps within their location
+- The Business Administrator retains oversight and can view or adjust any location's schedule
+
+**Delegate to Department Administrators:**
+- Assign team leads or department heads as Department Administrators
+- They manage scheduling for their specific department only
+- Perfect for specialized teams (e.g., Kitchen Manager schedules kitchen staff)
+- Reduces bottlenecks by distributing scheduling workload
+- Department Admins can only see and manage employees in their department
+
+**Why Delegation Matters:**
+- **Reduce Your Workload** - Stop being the bottleneck for every schedule change
+- **Local Knowledge** - Let managers who know their team best create the schedules
+- **Faster Response** - Leave requests and swaps are handled by the nearest manager
+- **Maintain Control** - Higher-level admins can always review and override decisions
+- **Scale Effortlessly** - Add locations and departments without increasing your personal workload
+
 ### Comprehensive Schedule Management
 
 Create professional schedules quickly with our powerful scheduling tools:
@@ -141,22 +166,28 @@ The primary administrator for a single organization. Ideal for:
 
 ### Location Administrator
 
-Manages operations at a specific physical location. Perfect for:
+Manages operations at a specific physical location. When a Business Administrator delegates scheduling to a Location Administrator, that manager gains autonomy over their site while the business owner maintains oversight. Perfect for:
 
 - Store managers
 - Site supervisors
 - Branch managers
 
 **Capabilities:**
+- Full scheduling control for their assigned location
+- Create, edit, and publish schedules without waiting for head office
 - Manage employees at their assigned location
-- Create and publish schedules for their location
 - Approve leave requests for location employees
 - Handle shift swaps within their location
 - View location-specific reports
 
+**Delegation Benefits:**
+- Respond quickly to local staffing needs
+- Make scheduling decisions based on firsthand team knowledge
+- Free up Business Administrators for strategic work
+
 ### Department Administrator
 
-Oversees a specific department within a location. Suited for:
+Oversees a specific department within a location. This role allows scheduling responsibilities to be distributed even further, giving team leads control over their own area. Suited for:
 
 - Department heads
 - Team leads
@@ -165,8 +196,13 @@ Oversees a specific department within a location. Suited for:
 **Capabilities:**
 - Manage employees in their department
 - Create schedules for department staff
-- Approve department-specific requests
+- Approve department-specific leave requests and swaps
 - View department reports
+
+**Delegation Benefits:**
+- Specialized managers schedule their specialized teams
+- Reduces complexity for Location Administrators managing multiple departments
+- Employees get faster responses from their direct supervisor
 
 ### Employee
 
