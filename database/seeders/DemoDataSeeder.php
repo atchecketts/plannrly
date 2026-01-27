@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserBusinessRole;
 use App\Models\UserRoleAssignment;
+use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -23,8 +24,11 @@ class DemoDataSeeder extends Seeder
 
     private int $employeeCounter = 0;
 
+    private \Faker\Generator $faker;
+
     public function run(): void
     {
+        $this->faker = Faker::create();
         $this->seedHotelChain();
         $this->seedMedicalFacility();
         $this->seedLogisticsWarehouse();
@@ -149,8 +153,8 @@ class DemoDataSeeder extends Seeder
             if ($hasLocationAdmin) {
                 $locationAdmin = $this->createUser(
                     $tenant,
-                    fake()->firstName(),
-                    fake()->lastName(),
+                    $this->faker->firstName(),
+                    $this->faker->lastName(),
                     $this->generateEmail('manager', $locationData['city'])
                 );
                 $this->assignSystemRole($locationAdmin, SystemRole::LocationAdmin, $location);
@@ -168,8 +172,8 @@ class DemoDataSeeder extends Seeder
 
                 $deptAdmin = $this->createUser(
                     $tenant,
-                    fake()->firstName(),
-                    fake()->lastName(),
+                    $this->faker->firstName(),
+                    $this->faker->lastName(),
                     $this->generateEmail(Str::slug($deptConfig['name']).'-lead', $locationData['city'])
                 );
                 $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
@@ -241,8 +245,8 @@ class DemoDataSeeder extends Seeder
 
             $deptAdmin = $this->createUser(
                 $tenant,
-                fake()->firstName(),
-                fake()->lastName(),
+                $this->faker->firstName(),
+                $this->faker->lastName(),
                 $this->generateEmail(Str::slug($deptConfig['name']).'-supervisor', 'westside')
             );
             $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
@@ -313,8 +317,8 @@ class DemoDataSeeder extends Seeder
 
             $deptAdmin = $this->createUser(
                 $tenant,
-                fake()->firstName(),
-                fake()->lastName(),
+                $this->faker->firstName(),
+                $this->faker->lastName(),
                 $this->generateEmail(Str::slug($deptConfig['name']).'-lead', 'swift')
             );
             $this->assignSystemRole($deptAdmin, SystemRole::DepartmentAdmin, $location, $department);
@@ -580,7 +584,7 @@ class DemoDataSeeder extends Seeder
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $email,
-            'phone' => fake()->phoneNumber(),
+            'phone' => $this->faker->phoneNumber(),
             'password' => Hash::make('password'),
             'is_active' => true,
             'email_verified_at' => now(),
@@ -613,8 +617,8 @@ class DemoDataSeeder extends Seeder
             $this->employeeCounter++;
             $user = $this->createUser(
                 $tenant,
-                fake()->firstName(),
-                fake()->lastName(),
+                $this->faker->firstName(),
+                $this->faker->lastName(),
                 $this->generateEmail('employee'.$this->employeeCounter, Str::slug($tenant->name))
             );
 
