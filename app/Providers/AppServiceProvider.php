@@ -30,13 +30,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->ensureDirectoriesExist();
     }
 
     public function boot(): void
     {
-        $this->ensureDirectoriesExist();
-
         Tenant::observe(TenantObserver::class);
 
         Gate::policy(Tenant::class, TenantPolicy::class);
