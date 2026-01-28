@@ -47,7 +47,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ShiftSwapRequest::class, ShiftSwapPolicy::class);
         Gate::policy(UserEmploymentDetails::class, UserEmploymentDetailsPolicy::class);
 
-        $this->registerBladeDirectives();
+        $this->app->booted(function () {
+            $this->registerBladeDirectives();
+        });
     }
 
     protected function registerBladeDirectives(): void
