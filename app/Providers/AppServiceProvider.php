@@ -35,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->ensureDirectoriesExist();
+
         Tenant::observe(TenantObserver::class);
 
         Gate::policy(Tenant::class, TenantPolicy::class);
@@ -48,7 +50,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(UserEmploymentDetails::class, UserEmploymentDetailsPolicy::class);
 
         $this->registerBladeDirectives();
-        $this->ensureDirectoriesExist();
     }
 
     protected function registerBladeDirectives(): void
