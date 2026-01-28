@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Enums\FeatureAddon;
 use App\Models\BusinessRole;
 use App\Models\Department;
 use App\Models\LeaveRequest;
@@ -22,7 +21,6 @@ use App\Policies\ShiftSwapPolicy;
 use App\Policies\TenantPolicy;
 use App\Policies\UserEmploymentDetailsPolicy;
 use App\Policies\UserPolicy;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -46,29 +44,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
         Gate::policy(ShiftSwapRequest::class, ShiftSwapPolicy::class);
         Gate::policy(UserEmploymentDetails::class, UserEmploymentDetailsPolicy::class);
-
-        $this->app->booted(function () {
-            $this->registerBladeDirectives();
-        });
-    }
-
-    protected function registerBladeDirectives(): void
-    {
-        Blade::if('feature', function (string $feature) {
-            $user = auth()->user();
-
-            if (! $user || ! $user->tenant) {
-                return false;
-            }
-
-            $featureEnum = FeatureAddon::tryFrom($feature);
-
-            if (! $featureEnum) {
-                return false;
-            }
-
-            return $user->tenant->hasFeature($featureEnum);
-        });
     }
 
     protected function ensureDirectoriesExist(): void
