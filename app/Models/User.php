@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -94,6 +95,16 @@ class User extends Authenticatable
     public function filterDefaults(): HasMany
     {
         return $this->hasMany(UserFilterDefault::class);
+    }
+
+    public function employmentDetails(): HasOne
+    {
+        return $this->hasOne(UserEmploymentDetails::class);
+    }
+
+    public function availability(): HasMany
+    {
+        return $this->hasMany(UserAvailability::class);
     }
 
     public function getFullNameAttribute(): string

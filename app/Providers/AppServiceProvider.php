@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Enums\FeatureAddon;
 use App\Models\BusinessRole;
 use App\Models\Department;
 use App\Models\LeaveRequest;
@@ -10,6 +11,7 @@ use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\UserEmploymentDetails;
 use App\Observers\TenantObserver;
 use App\Policies\BusinessRolePolicy;
 use App\Policies\DepartmentPolicy;
@@ -18,7 +20,9 @@ use App\Policies\LocationPolicy;
 use App\Policies\ShiftPolicy;
 use App\Policies\ShiftSwapPolicy;
 use App\Policies\TenantPolicy;
+use App\Policies\UserEmploymentDetailsPolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,8 +45,29 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Shift::class, ShiftPolicy::class);
         Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
         Gate::policy(ShiftSwapRequest::class, ShiftSwapPolicy::class);
+        Gate::policy(UserEmploymentDetails::class, UserEmploymentDetailsPolicy::class);
 
+        $this->registerBladeDirectives();
         $this->ensureDirectoriesExist();
+    }
+
+    protected function registerBladeDirectives(): void
+    {
+        Blade::if('feature', function (string $feature) {
+            $user = auth()->user();
+
+            if (! $user || ! $user->tenant) {
+                return false;
+            }
+
+            $featureEnum = FeatureAddon::tryFrom($feature);
+
+            if (! $featureEnum) {
+                return false;
+            }
+
+            return $user->tenant->hasFeature($featureEnum);
+        });
     }
 
     protected function ensureDirectoriesExist(): void
@@ -58,6 +83,5 @@ class AppServiceProvider extends ServiceProvider
                 mkdir($path, 0755, true);
             }
         }
-
     }
 }

@@ -2,6 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AvailabilityType;
+use App\Enums\EmploymentStatus;
+use App\Enums\PayType;
+use App\Enums\PreferenceLevel;
 use App\Enums\ShiftStatus;
 use App\Enums\SystemRole;
 use App\Models\BusinessRole;
@@ -10,7 +14,9 @@ use App\Models\Location;
 use App\Models\Shift;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\UserAvailability;
 use App\Models\UserBusinessRole;
+use App\Models\UserEmploymentDetails;
 use App\Models\UserRoleAssignment;
 use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
@@ -646,10 +652,153 @@ class DemoDataSeeder extends Seeder
                 }
             }
 
+            $this->createEmploymentDetails($user, $primaryRole);
+            $this->createAvailability($user);
+
             $employees[] = ['user' => $user, 'primaryRole' => $primaryRole];
         }
 
         $this->createShiftsForEmployees($tenant, $department, $employees);
+    }
+
+    private function createEmploymentDetails(User $user, BusinessRole $primaryRole): void
+    {
+        $statuses = [
+            EmploymentStatus::Active,
+            EmploymentStatus::Active,
+            EmploymentStatus::Active,
+            EmploymentStatus::Active,
+            EmploymentStatus::OnLeave,
+            EmploymentStatus::NoticePeriod,
+        ];
+        $status = $statuses[array_rand($statuses)];
+
+        $payTypes = [PayType::Hourly, PayType::Hourly, PayType::Salaried];
+        $payType = $payTypes[array_rand($payTypes)];
+
+        $startDate = $this->faker->dateTimeBetween('-5 years', '-1 month');
+        $probationEndDate = rand(1, 100) <= 20 ? now()->addDays(rand(30, 90)) : Carbon::parse($startDate)->addMonths(3);
+
+        $data = [
+            'user_id' => $user->id,
+            'employment_start_date' => $startDate,
+            'employment_status' => $status,
+            'pay_type' => $payType,
+            'currency' => 'GBP',
+            'probation_end_date' => $probationEndDate,
+            'target_hours_per_week' => $this->faker->randomElement([20, 30, 37.5, 40]),
+            'min_hours_per_week' => $this->faker->randomElement([null, 16, 20, 24]),
+            'max_hours_per_week' => $this->faker->randomElement([null, 40, 45, 48]),
+            'overtime_eligible' => $this->faker->boolean(60),
+        ];
+
+        if ($payType === PayType::Hourly) {
+            $data['base_hourly_rate'] = $primaryRole->default_hourly_rate + $this->faker->randomFloat(2, -2, 5);
+        } else {
+            $data['annual_salary'] = $this->faker->randomElement([28000, 32000, 38000, 45000, 52000, 65000]);
+        }
+
+        if ($status === EmploymentStatus::NoticePeriod) {
+            $data['final_working_date'] = now()->addDays(rand(14, 60));
+        }
+
+        if ($status === EmploymentStatus::OnLeave) {
+            $data['notes'] = $this->faker->randomElement([
+                'On parental leave until ' . now()->addWeeks(rand(4, 12))->format('d M Y'),
+                'Medical leave - expected return ' . now()->addWeeks(rand(2, 6))->format('d M Y'),
+                'Sabbatical leave',
+            ]);
+        }
+
+        UserEmploymentDetails::create($data);
+    }
+
+    private function createAvailability(User $user): void
+    {
+        if (rand(1, 100) <= 30) {
+            return;
+        }
+
+        $availabilityPatterns = [
+            'weekdays_day' => [
+                ['day' => 1, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 2, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 3, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 4, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 5, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 6, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+                ['day' => 0, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+            ],
+            'flexible' => [
+                ['day' => 1, 'start' => '06:00', 'end' => '22:00', 'level' => PreferenceLevel::Available],
+                ['day' => 2, 'start' => '06:00', 'end' => '22:00', 'level' => PreferenceLevel::Available],
+                ['day' => 3, 'start' => '06:00', 'end' => '22:00', 'level' => PreferenceLevel::Available],
+                ['day' => 4, 'start' => '06:00', 'end' => '22:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 5, 'start' => '06:00', 'end' => '22:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 6, 'start' => '08:00', 'end' => '18:00', 'level' => PreferenceLevel::IfNeeded],
+                ['day' => 0, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+            ],
+            'part_time' => [
+                ['day' => 1, 'start' => '09:00', 'end' => '14:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 2, 'start' => '09:00', 'end' => '14:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 3, 'start' => '09:00', 'end' => '14:00', 'level' => PreferenceLevel::Available],
+                ['day' => 4, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+                ['day' => 5, 'start' => '09:00', 'end' => '14:00', 'level' => PreferenceLevel::Available],
+                ['day' => 6, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+                ['day' => 0, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+            ],
+            'evening_shift' => [
+                ['day' => 1, 'start' => '14:00', 'end' => '23:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 2, 'start' => '14:00', 'end' => '23:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 3, 'start' => '14:00', 'end' => '23:00', 'level' => PreferenceLevel::Available],
+                ['day' => 4, 'start' => '14:00', 'end' => '23:00', 'level' => PreferenceLevel::Available],
+                ['day' => 5, 'start' => '14:00', 'end' => '23:00', 'level' => PreferenceLevel::Available],
+                ['day' => 6, 'start' => '16:00', 'end' => '23:00', 'level' => PreferenceLevel::IfNeeded],
+                ['day' => 0, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+            ],
+            'weekend_preferred' => [
+                ['day' => 1, 'start' => null, 'end' => null, 'level' => PreferenceLevel::IfNeeded],
+                ['day' => 2, 'start' => null, 'end' => null, 'level' => PreferenceLevel::Unavailable],
+                ['day' => 3, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::IfNeeded],
+                ['day' => 4, 'start' => '09:00', 'end' => '17:00', 'level' => PreferenceLevel::Available],
+                ['day' => 5, 'start' => '09:00', 'end' => '21:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 6, 'start' => '08:00', 'end' => '22:00', 'level' => PreferenceLevel::Preferred],
+                ['day' => 0, 'start' => '08:00', 'end' => '18:00', 'level' => PreferenceLevel::Preferred],
+            ],
+        ];
+
+        $patternKey = array_rand($availabilityPatterns);
+        $pattern = $availabilityPatterns[$patternKey];
+
+        foreach ($pattern as $slot) {
+            UserAvailability::create([
+                'user_id' => $user->id,
+                'type' => AvailabilityType::Recurring,
+                'day_of_week' => $slot['day'],
+                'start_time' => $slot['start'],
+                'end_time' => $slot['end'],
+                'is_available' => $slot['level'] !== PreferenceLevel::Unavailable,
+                'preference_level' => $slot['level'],
+            ]);
+        }
+
+        if (rand(1, 100) <= 40) {
+            $specificDate = now()->addDays(rand(7, 30));
+            UserAvailability::create([
+                'user_id' => $user->id,
+                'type' => AvailabilityType::SpecificDate,
+                'specific_date' => $specificDate,
+                'is_available' => false,
+                'preference_level' => PreferenceLevel::Unavailable,
+                'notes' => $this->faker->randomElement([
+                    'Medical appointment',
+                    'Personal commitment',
+                    'Family event',
+                    'Vacation day',
+                    'Training course',
+                ]),
+            ]);
+        }
     }
 
     private function createShiftsForEmployees(Tenant $tenant, Department $department, array $employees): void
