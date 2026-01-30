@@ -5,21 +5,71 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Location\StoreLocationRequest;
 use App\Http\Requests\Location\UpdateLocationRequest;
 use App\Models\Location;
+use App\Traits\HandlesSorting;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class LocationController extends Controller
 {
-    public function index(): View
+    use HandlesSorting;
+
+    private const SORTABLE_COLUMNS = [
+        'name' => 'name',
+        'city' => 'city',
+        'departments' => 'departments_count',
+        'status' => 'is_active',
+    ];
+
+    private const GROUPABLE_COLUMNS = ['name', 'city', 'departments', 'status'];
+
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', Location::class);
 
-        $locations = Location::with('departments')
-            ->withCount('departments')
-            ->orderBy('name')
-            ->paginate(15);
+        $query = Location::with('departments')
+            ->withCount('departments');
 
-        return view('locations.index', compact('locations'));
+        $sortParams = $this->getSortParameters($request, self::SORTABLE_COLUMNS, self::GROUPABLE_COLUMNS);
+        $allGroups = $this->getLocationGroups($query, $sortParams['group']);
+
+        $this->applySorting($query, $request, self::SORTABLE_COLUMNS, 'name', 'asc', self::GROUPABLE_COLUMNS);
+
+        // When grouping, fetch all records; otherwise paginate
+        if ($sortParams['group']) {
+            $locations = $query->get();
+        } else {
+            $locations = $query->paginate(15)->withQueryString();
+        }
+
+        return view('locations.index', compact('locations', 'sortParams', 'allGroups'));
+    }
+
+    private function getLocationGroups($query, ?string $group): array
+    {
+        if (! $group) {
+            return [];
+        }
+
+        return match ($group) {
+            'name' => $this->getAllGroupValues($query, 'name', fn ($name) => [
+                'key' => 'name-'.strtoupper(substr($name, 0, 1)),
+                'label' => strtoupper(substr($name, 0, 1)),
+            ])->unique('key')->values()->toArray(),
+            'city' => $this->getAllGroupValues($query, 'city', fn ($city) => [
+                'key' => 'city-'.\Str::slug($city ?: 'no-city'),
+                'label' => $city ?: 'No City',
+            ])->toArray(),
+            'departments' => $this->getAllGroupValues($query, 'departments_count', fn ($count) => [
+                'key' => 'departments-'.$count,
+                'label' => $count.' '.str('Department')->plural($count),
+            ])->toArray(),
+            'status' => $this->getAllGroupValues($query, 'is_active', fn ($isActive) => [
+                'key' => 'status-'.($isActive ? 'active' : 'inactive'),
+                'label' => $isActive ? 'Active' : 'Inactive',
+            ])->toArray(),
+            default => [],
+        };
     }
 
     public function create(): View

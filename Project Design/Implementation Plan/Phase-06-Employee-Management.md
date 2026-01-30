@@ -65,7 +65,7 @@ Comprehensive employment records for administrators.
 - `app/Policies/UserEmploymentDetailsPolicy.php`
 - `resources/views/users/employment.blade.php`
 - `database/factories/UserEmploymentDetailsFactory.php`
-- `tests/Feature/EmploymentDetailsTest.php` (15 tests)
+- `tests/Feature/EmploymentDetailsTest.php` (22 tests)
 
 **Features:**
 | Field | Description |
@@ -86,10 +86,16 @@ Comprehensive employment records for administrators.
 | HR Notes | Private administrative notes |
 
 **Role-Specific Pay Rates:**
-The `user_business_roles` pivot table already has `hourly_rate` column for role-specific rates.
-- If user has a custom rate for a role, use that
-- Otherwise fall back to user's base_hourly_rate
-- Otherwise fall back to role's default_hourly_rate
+The `user_business_roles` pivot table has `hourly_rate` column for role-specific rates.
+- Employment Details form includes "Role-Specific Hourly Rates" section
+- Shows all assigned business roles with input for custom hourly rate
+- Displays role's default rate as reference (e.g., "Default: 15.00")
+- User show page displays effective rate per role with "Custom rate" or "Default rate" label
+- Employee profile shows their rates (read-only)
+
+**Rate Hierarchy:**
+1. If user has a custom rate for a role, use that
+2. Otherwise fall back to role's default_hourly_rate
 
 **Tasks:**
 - [x] Create UserEmploymentDetails model with casts and accessors
@@ -97,6 +103,9 @@ The `user_business_roles` pivot table already has `hourly_rate` column for role-
 - [x] Create PayType enum
 - [x] Create EmploymentDetailsController
 - [x] Create employment details form (tab on user edit page)
+- [x] Add role-specific hourly rates section to employment form
+- [x] Display role hourly rates on user show page
+- [x] Display role hourly rates on employee profile (read-only)
 - [x] Implement pay rate hierarchy logic
 - [x] Add employment status badges to user list
 - [ ] Show employees on notice period/leaving soon on dashboard (future enhancement)
@@ -160,16 +169,30 @@ Allow employees to set availability and admins to view it during scheduling.
 
 ---
 
-## 6.4 Leave Calendar View
-**Effort: Medium**
+## 6.4 Leave Calendar View (Schedule Integration) ✅
+**Effort: Medium** | **Status: Completed**
 
-**Files to create:**
-- `resources/views/leave/calendar.blade.php`
+Integrated leave display into existing schedule views rather than creating a separate calendar.
+
+**Files modified:**
+- `app/Http/Controllers/ScheduleController.php` - Added leaveType eager loading
+- `resources/views/schedule/index.blade.php` - Week view with colored leave blocks and half-day support
+- `resources/views/schedule/day.blade.php` - Day view with positioned leave bars and half-day support
+- `database/factories/LeaveRequestFactory.php` - Added startHalfDay() and endHalfDay() states
+- `tests/Feature/LeaveCalendarViewTest.php` (new - 15 tests)
+
+**Features:**
+- Leave displayed in schedule week view with leave type colors
+- Leave displayed in schedule day view with positioned bars
+- Half-day leave support:
+  - AM leave shows left half of cell (week view) or start-to-noon (day view)
+  - PM leave shows right half of cell (week view) or noon-to-end (day view)
+- Colors use LeaveType.color field (e.g., blue for Annual, red for Sick)
 
 **Tasks:**
-- [ ] Create calendar view showing all leave requests
-- [ ] Color-code by leave type
-- [ ] Show status (pending/approved/rejected)
-- [ ] Filter by department/location
-- [ ] Add to leave management section
-- [ ] Write tests
+- [x] Update ScheduleController to eager load leaveType relationship
+- [x] Update week view leave blocks to use leave type colors
+- [x] Implement half-day display in week view (AM/PM split cells)
+- [x] Update day view leave blocks to use leave type colors
+- [x] Implement half-day positioning in day view (time-based)
+- [x] Write tests

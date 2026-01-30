@@ -6,6 +6,7 @@ use App\Enums\EmploymentStatus;
 use App\Enums\PayType;
 use App\Http\Requests\Employment\UpdateEmploymentDetailsRequest;
 use App\Models\User;
+use App\Models\UserBusinessRole;
 use App\Models\UserEmploymentDetails;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -16,7 +17,7 @@ class EmploymentDetailsController extends Controller
     {
         $this->authorize('update', $user->employmentDetails ?? new UserEmploymentDetails(['user_id' => $user->id]));
 
-        $user->load('employmentDetails');
+        $user->load(['employmentDetails', 'userBusinessRoles.businessRole']);
 
         $employmentStatuses = EmploymentStatus::cases();
         $payTypes = PayType::cases();
@@ -47,6 +48,15 @@ class EmploymentDetailsController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]
         );
+
+        if (! empty($data['role_rates'])) {
+            foreach ($data['role_rates'] as $roleId => $rate) {
+                UserBusinessRole::query()
+                    ->where('user_id', $user->id)
+                    ->where('business_role_id', $roleId)
+                    ->update(['hourly_rate' => $rate !== '' ? $rate : null]);
+            }
+        }
 
         return redirect()
             ->route('users.show', $user)

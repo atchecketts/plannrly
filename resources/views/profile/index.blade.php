@@ -145,14 +145,24 @@
                     @else
                         <ul role="list" class="divide-y divide-gray-800">
                             @foreach($user->businessRoles as $role)
+                                @php
+                                    $effectiveRate = $role->pivot->hourly_rate ?? $role->default_hourly_rate;
+                                @endphp
                                 <li class="py-3 first:pt-0 last:pb-0">
-                                    <p class="text-sm font-medium text-white">
-                                        {{ $role->name }}
-                                        @if($role->pivot->is_primary)
-                                            <span class="ml-2 inline-flex items-center rounded bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-400">Primary</span>
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-white">
+                                                {{ $role->name }}
+                                                @if($role->pivot->is_primary)
+                                                    <span class="ml-2 inline-flex items-center rounded bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-400">Primary</span>
+                                                @endif
+                                            </p>
+                                            <p class="text-xs text-gray-400">{{ $role->department->name }}</p>
+                                        </div>
+                                        @if($effectiveRate)
+                                            <p class="text-sm text-gray-300">{{ number_format($effectiveRate, 2) }}/hr</p>
                                         @endif
-                                    </p>
-                                    <p class="text-xs text-gray-400">{{ $role->department->name }}</p>
+                                    </div>
                                 </li>
                             @endforeach
                         </ul>

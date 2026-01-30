@@ -111,4 +111,15 @@ class UserPolicy
 
         return false;
     }
+
+    /**
+     * Determine if user can view attendance reports.
+     */
+    public function viewReports(User $authUser): bool
+    {
+        return $authUser->isSuperAdmin()
+            || $authUser->isAdmin()
+            || $authUser->isLocationAdmin()
+            || $authUser->isDepartmentAdmin();
+    }
 }

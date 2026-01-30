@@ -35,7 +35,7 @@ class TenantSeeder extends Seeder
                 'tenant_id' => $plannrly->id,
                 'first_name' => 'Adrian',
                 'last_name' => 'SuperAdmin',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('Holly952179'),
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]

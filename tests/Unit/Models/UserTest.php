@@ -3,11 +3,11 @@
 namespace Tests\Unit\Models;
 
 use App\Enums\SystemRole;
+use App\Models\Department;
+use App\Models\Location;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
-use App\Models\Location;
-use App\Models\Department;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

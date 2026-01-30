@@ -4,12 +4,24 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Traits\HandlesSorting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TenantController extends Controller
 {
+    use HandlesSorting;
+
+    private const SORTABLE_COLUMNS = [
+        'organization' => 'name',
+        'users' => 'users_count',
+        'status' => 'is_active',
+        'created' => 'created_at',
+    ];
+
+    private const GROUPABLE_COLUMNS = ['organization', 'users', 'status', 'created'];
+
     public function index(Request $request): View
     {
         $query = Tenant::query()
@@ -29,9 +41,65 @@ class TenantController extends Controller
             $query->where('is_active', $request->status === 'active');
         }
 
-        $tenants = $query->latest()->paginate(15);
+        $sortParams = $this->getSortParameters($request, self::SORTABLE_COLUMNS, self::GROUPABLE_COLUMNS);
+        $allGroups = $this->getTenantGroups($query, $sortParams['group']);
 
-        return view('super-admin.tenants.index', compact('tenants'));
+        $this->applySorting($query, $request, self::SORTABLE_COLUMNS, 'created', 'desc', self::GROUPABLE_COLUMNS);
+
+        // When grouping, fetch all records; otherwise paginate
+        if ($sortParams['group']) {
+            $tenants = $query->get();
+        } else {
+            $tenants = $query->paginate(15)->withQueryString();
+        }
+
+        return view('super-admin.tenants.index', compact('tenants', 'sortParams', 'allGroups'));
+    }
+
+    /**
+     * Get all unique group values for tenants.
+     */
+    private function getTenantGroups($query, ?string $group): array
+    {
+        if (! $group) {
+            return [];
+        }
+
+        return match ($group) {
+            'organization' => $this->getAllGroupValues(
+                $query,
+                'name',
+                fn ($name) => [
+                    'key' => 'organization-'.strtoupper(substr($name, 0, 1)),
+                    'label' => strtoupper(substr($name, 0, 1)),
+                ]
+            )->unique('key')->values()->toArray(),
+            'users' => $this->getAllGroupValues(
+                $query,
+                'users_count',
+                fn ($count) => [
+                    'key' => 'users-'.$count,
+                    'label' => $count.' '.str('User')->plural($count),
+                ]
+            )->toArray(),
+            'status' => $this->getAllGroupValues(
+                $query,
+                'is_active',
+                fn ($isActive) => [
+                    'key' => 'status-'.($isActive ? 'active' : 'inactive'),
+                    'label' => $isActive ? 'Active' : 'Inactive',
+                ]
+            )->toArray(),
+            'created' => $this->getAllGroupValues(
+                $query,
+                'created_at',
+                fn ($date) => [
+                    'key' => 'created-'.$date->format('Y-m-d'),
+                    'label' => $date->format('M d, Y'),
+                ]
+            )->unique('key')->values()->toArray(),
+            default => [],
+        };
     }
 
     public function show(Tenant $tenant): View

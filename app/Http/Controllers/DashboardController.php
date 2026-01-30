@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Enums\LeaveRequestStatus;
 use App\Enums\ShiftStatus;
 use App\Enums\SwapRequestStatus;
+use App\Enums\TimeEntryStatus;
 use App\Models\LeaveRequest;
 use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
+use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\View\View;
 
@@ -137,6 +139,18 @@ class DashboardController extends Controller
                     $query->where('department_id', $departmentId);
                 }
             })->where('status', SwapRequestStatus::Pending)->count(),
+            'missed_shifts_today' => TimeEntry::where('tenant_id', $tenantId)
+                ->where('status', TimeEntryStatus::Missed)
+                ->whereHas('shift', function ($query) use ($locationId, $departmentId) {
+                    $query->whereDate('date', today());
+                    if ($locationId) {
+                        $query->where('location_id', $locationId);
+                    }
+                    if ($departmentId) {
+                        $query->where('department_id', $departmentId);
+                    }
+                })
+                ->count(),
         ];
 
         $todayShifts = Shift::with(['user', 'department', 'businessRole', 'location'])
@@ -212,7 +226,94 @@ class DashboardController extends Controller
 
     protected function employeeDashboard(): View
     {
-        // Employee-specific dashboard removed - show admin dashboard for now
-        return $this->adminDashboard();
+        $user = auth()->user();
+        $tenantId = $user->tenant_id;
+
+        // Get upcoming shifts for this employee (next 7 days)
+        $upcomingShifts = Shift::with(['department', 'businessRole', 'location'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->whereDate('date', '>=', today())
+            ->whereDate('date', '<=', today()->addDays(7))
+            ->where('status', ShiftStatus::Published)
+            ->orderBy('date')
+            ->orderBy('start_time')
+            ->get();
+
+        // Get next shift for countdown
+        $nextShift = Shift::with(['department', 'businessRole', 'location'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->where('status', ShiftStatus::Published)
+            ->where(function ($query) {
+                $query->whereDate('date', '>', today())
+                    ->orWhere(function ($q) {
+                        $q->whereDate('date', today())
+                            ->whereTime('start_time', '>', now()->format('H:i:s'));
+                    });
+            })
+            ->orderBy('date')
+            ->orderBy('start_time')
+            ->first();
+
+        // Get employee's pending leave requests
+        $myLeaveRequests = LeaveRequest::with('leaveType')
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->whereIn('status', [LeaveRequestStatus::Draft, LeaveRequestStatus::Requested])
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get();
+
+        // Get employee's swap requests (both sent and received)
+        $mySwapRequests = ShiftSwapRequest::with([
+            'requestingUser',
+            'targetUser',
+            'requestingShift.businessRole',
+            'targetShift.businessRole',
+        ])
+            ->where('tenant_id', $tenantId)
+            ->where(function ($query) use ($user) {
+                $query->where('requesting_user_id', $user->id)
+                    ->orWhere('target_user_id', $user->id);
+            })
+            ->whereIn('status', [SwapRequestStatus::Pending, SwapRequestStatus::Accepted])
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get();
+
+        // Calculate hours this week for employee
+        $weekStart = now()->startOfWeek();
+        $weekEnd = now()->endOfWeek();
+        $hoursThisWeek = Shift::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->whereBetween('date', [$weekStart, $weekEnd])
+            ->get()
+            ->sum('working_hours');
+
+        // Count missed shifts for this employee (this week)
+        $missedShiftsCount = TimeEntry::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->where('status', TimeEntryStatus::Missed)
+            ->whereHas('shift', function ($query) use ($weekStart, $weekEnd) {
+                $query->whereBetween('date', [$weekStart, $weekEnd]);
+            })
+            ->count();
+
+        $stats = [
+            'upcoming_shifts' => $upcomingShifts->count(),
+            'hours_this_week' => round($hoursThisWeek),
+            'pending_leave' => $myLeaveRequests->count(),
+            'pending_swaps' => $mySwapRequests->count(),
+            'missed_shifts' => $missedShiftsCount,
+        ];
+
+        return view('dashboard.employee', compact(
+            'upcomingShifts',
+            'nextShift',
+            'myLeaveRequests',
+            'mySwapRequests',
+            'stats'
+        ));
     }
 }

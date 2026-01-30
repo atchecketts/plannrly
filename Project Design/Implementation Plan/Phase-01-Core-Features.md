@@ -128,35 +128,12 @@ Allow business admins to configure organization settings.
 
 ---
 
-## 1.6 Subscription & Feature Management
-**Effort: Large**
+## 1.6 Subscription & Feature Management ✅
+**Effort: Large** | **Status: Completed**
 
 Manage tenant subscriptions and premium feature add-ons (required for AI Scheduling).
 
-**Database Changes:**
-- [ ] Create migration for `tenant_subscriptions` table:
-  - `id` (bigint unsigned, PK)
-  - `tenant_id` (FK to tenants, unique)
-  - `plan` (varchar, default 'basic')
-  - `status` (varchar, default 'active')
-  - `billing_cycle` (varchar, default 'monthly')
-  - `current_period_start` (timestamp)
-  - `current_period_end` (timestamp)
-  - `cancelled_at` (timestamp, nullable)
-  - `stripe_subscription_id` (varchar, nullable)
-  - `timestamps`
-
-- [ ] Create migration for `tenant_feature_addons` table:
-  - `id` (bigint unsigned, PK)
-  - `tenant_id` (FK to tenants)
-  - `feature` (varchar)
-  - `enabled_at` (timestamp)
-  - `expires_at` (timestamp, nullable)
-  - `stripe_subscription_item_id` (varchar, nullable)
-  - `timestamps`
-  - UNIQUE (tenant_id, feature)
-
-**Files to create:**
+**Files created:**
 - `app/Models/TenantSubscription.php`
 - `app/Models/TenantFeatureAddon.php`
 - `app/Enums/SubscriptionPlan.php`
@@ -170,46 +147,48 @@ Manage tenant subscriptions and premium feature add-ons (required for AI Schedul
 - `resources/views/subscription/index.blade.php`
 - `resources/views/subscription/upgrade.blade.php`
 - `resources/views/components/feature-gate.blade.php`
-- `tests/Feature/SubscriptionTest.php`
-- `tests/Unit/FeatureGateTest.php`
-
-**Subscription Plans:**
-| Plan | Description | Includes |
-|------|-------------|----------|
-| basic | Base subscription | All core features |
-| professional | Professional plan | + AI Scheduling, Analytics |
-| enterprise | Enterprise plan | All features included |
-
-**Feature Add-ons:**
-| Feature | Description |
-|---------|-------------|
-| ai_scheduling | AI-Powered Scheduling |
-| advanced_analytics | Advanced Analytics & Reports |
-| api_access | API Access for Integrations |
-| priority_support | Priority Support |
+- `database/migrations/2026_01_28_000001_create_tenant_subscriptions_table.php`
+- `database/migrations/2026_01_28_000002_create_tenant_feature_addons_table.php`
+- `tests/Feature/SubscriptionManagementTest.php`
+- `tests/Unit/SubscriptionPlanTest.php`
 
 **Tasks:**
-- [ ] Create TenantSubscription model with relationships
-- [ ] Create TenantFeatureAddon model
-- [ ] Create all subscription/feature enums
-- [ ] Add `hasFeature()` method to Tenant model
-- [ ] Add `hasAIScheduling()` convenience method to Tenant model
-- [ ] Create RequiresFeature middleware
-- [ ] Register middleware alias in bootstrap/app.php
-- [ ] Create SubscriptionService for subscription management
-- [ ] Create SubscriptionController for viewing/managing subscription
-- [ ] Create FeatureController with status endpoint
-- [ ] Create subscription index view (shows current plan, features)
-- [ ] Create upgrade prompt view
-- [ ] Create `@feature` Blade directive
-- [ ] Create feature-gate component for UI
-- [ ] Update Tenant model with subscription relationships
-- [ ] Write unit tests for feature checks
-- [ ] Write feature tests for middleware
-- [ ] Write tests for subscription management
+- [x] Create TenantSubscription model with relationships
+- [x] Create TenantFeatureAddon model
+- [x] Create all subscription/feature enums
+- [x] Add `hasFeature()` method to Tenant model
+- [x] Add `hasAIScheduling()` convenience method to Tenant model
+- [x] Create RequiresFeature middleware
+- [x] Register middleware alias in bootstrap/app.php
+- [x] Create SubscriptionService for subscription management
+- [x] Create SubscriptionController for viewing/managing subscription
+- [x] Create FeatureController with status endpoint
+- [x] Create subscription index view (shows current plan, features)
+- [x] Create upgrade prompt view
+- [x] Create `@feature` Blade directive
+- [x] Create feature-gate component for UI
+- [x] Update Tenant model with subscription relationships
+- [x] Write unit tests for feature checks
+- [x] Write feature tests for middleware
+- [x] Write tests for subscription management
 
-**UI Integration:**
-- Add "Subscription" link in admin settings menu
-- Show current plan badge in header/sidebar
-- Show upgrade prompts where premium features are unavailable
-- Hide/disable AI Scheduling UI when feature not enabled
+---
+
+## 1.7 Sortable Table Headers ✅
+**Effort: Medium** | **Status: Completed**
+
+Add sortable and groupable column headers to all 10 list views.
+
+**Files created:**
+- `app/Traits/HandlesSorting.php`
+- `resources/views/components/table/sortable-header.blade.php`
+- `resources/views/components/table/group-header.blade.php`
+- `tests/Feature/TableSortingTest.php`
+
+**Tasks:**
+- [x] Create HandlesSorting trait for controller reuse
+- [x] Create sortable-header Blade component
+- [x] Create group-header Blade component for groupable columns
+- [x] Integrate sorting into all 10 list views
+- [x] Add query string persistence for sort/direction/group
+- [x] Write tests for sorting functionality

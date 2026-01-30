@@ -21,65 +21,57 @@
                         <th class="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-300">Employee</th>
                     @endif
                     <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-300">Type</th>
-                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-300">Dates</th>
-                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-300">Days</th>
-                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-300">Status</th>
+                    <x-table.sortable-header column="start_date" label="Dates" :currentSort="$sortParams['sort']" :currentDirection="$sortParams['direction']" :currentGroup="$sortParams['group']" :groupable="true" />
+                    <x-table.sortable-header column="days" label="Days" :currentSort="$sortParams['sort']" :currentDirection="$sortParams['direction']" :currentGroup="$sortParams['group']" :groupable="true" />
+                    <x-table.sortable-header column="status" label="Status" :currentSort="$sortParams['sort']" :currentDirection="$sortParams['direction']" :currentGroup="$sortParams['group']" :groupable="true" />
                     <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-800">
-                @forelse($leaveRequests as $request)
-                    <tr class="hover:bg-gray-800/50 transition-colors">
-                        @if(auth()->user()->isAdmin() || auth()->user()->isLocationAdmin() || auth()->user()->isDepartmentAdmin())
-                            <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-white">
-                                {{ $request->user->full_name }}
-                            </td>
-                        @endif
-                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-400">
-                            <span class="inline-flex items-center gap-2">
-                                <span class="inline-block h-3 w-3 rounded-full" style="background-color: {{ $request->leaveType->color }}"></span>
-                                {{ $request->leaveType->name }}
-                            </span>
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-400">
-                            {{ $request->start_date->format('M d') }} - {{ $request->end_date->format('M d, Y') }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-400">{{ $request->total_days }}</td>
-                        <td class="whitespace-nowrap px-3 py-4 text-sm">
-                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset
-                                {{ $request->status->color() === 'gray' ? 'bg-gray-500/10 text-gray-400 ring-gray-500/20' : '' }}
-                                {{ $request->status->color() === 'yellow' ? 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20' : '' }}
-                                {{ $request->status->color() === 'green' ? 'bg-green-500/10 text-green-400 ring-green-500/20' : '' }}
-                                {{ $request->status->color() === 'red' ? 'bg-red-500/10 text-red-400 ring-red-500/20' : '' }}">
-                                {{ $request->status->label() }}
-                            </span>
-                        </td>
-                        <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
-                            <a href="{{ route('leave-requests.show', $request) }}" class="text-brand-400 hover:text-brand-300">View</a>
-                            @can('review', $request)
-                                <form action="{{ route('leave-requests.review', $request) }}" method="POST" class="inline ml-4">
-                                    @csrf
-                                    <input type="hidden" name="action" value="approve">
-                                    <button type="submit" class="text-green-400 hover:text-green-300">Approve</button>
-                                </form>
-                                <form action="{{ route('leave-requests.review', $request) }}" method="POST" class="inline ml-2">
-                                    @csrf
-                                    <input type="hidden" name="action" value="reject">
-                                    <button type="submit" class="text-red-400 hover:text-red-300">Reject</button>
-                                </form>
-                            @endcan
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="6" class="px-3 py-8 text-center text-sm text-gray-500">No leave requests found.</td>
-                    </tr>
-                @endforelse
+            <tbody class="divide-y divide-gray-800" x-data="{
+                expandedGroups: {},
+                toggleGroup(key) {
+                    this.expandedGroups[key] = !this.expandedGroups[key];
+                },
+                isExpanded(key) {
+                    return this.expandedGroups[key] === true;
+                }
+            }">
+                @if($sortParams['group'] && !empty($allGroups))
+                    @foreach($allGroups as $group)
+                        @php
+                            $groupKey = $group['key'];
+                            $groupLabel = $group['label'];
+                            $groupRequests = $leaveRequests->filter(function($leaveRequest) use ($sortParams, $groupKey) {
+                                return match($sortParams['group']) {
+                                    'start_date' => $groupKey === 'start_date-' . $leaveRequest->start_date->format('Y-m-d'),
+                                    'days' => $groupKey === 'days-' . $leaveRequest->total_days,
+                                    'status' => $groupKey === 'status-' . $leaveRequest->status->value,
+                                    'created' => $groupKey === 'created-' . $leaveRequest->created_at->format('Y-m-d'),
+                                    default => false,
+                                };
+                            });
+                        @endphp
+                        <x-table.group-header :label="$groupLabel" :groupKey="$groupKey" :colspan="6" :count="$groupRequests->count()" />
+                        @foreach($groupRequests as $leaveRequest)
+                            @include('leave._row', ['leaveRequest' => $leaveRequest, 'groupKey' => $groupKey])
+                        @endforeach
+                    @endforeach
+                @else
+                    @forelse($leaveRequests as $leaveRequest)
+                        @include('leave._row', ['leaveRequest' => $leaveRequest, 'groupKey' => null])
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-3 py-8 text-center text-sm text-gray-500">No leave requests found.</td>
+                        </tr>
+                    @endforelse
+                @endif
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $leaveRequests->links() }}
-    </div>
+    @if(!$sortParams['group'])
+        <div class="mt-4">
+            {{ $leaveRequests->links() }}
+        </div>
+    @endif
 </x-layouts.app>

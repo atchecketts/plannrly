@@ -22,7 +22,7 @@
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
              @click.stop
-             class="relative w-full max-w-md bg-gray-900 rounded-xl border border-gray-700 shadow-xl">
+             class="relative w-full max-w-lg bg-gray-900 rounded-xl border border-gray-700 shadow-xl max-h-[90vh] overflow-y-auto">
 
             <!-- Header -->
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
@@ -194,6 +194,140 @@
                     <p x-show="editModal.errors.notes" class="mt-1 text-xs text-red-400" x-text="editModal.errors.notes?.[0]"></p>
                 </div>
 
+                <!-- Recurrence Section (only for create mode or recurring parent) -->
+                <div x-show="editModal.isCreateMode || editModal.shift.is_recurring" class="border-t border-gray-700 pt-4 mt-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <label class="text-sm font-medium text-gray-400">Recurring Shift</label>
+                        <button type="button"
+                                x-show="editModal.isCreateMode"
+                                @click="editModal.shift.is_recurring = !editModal.shift.is_recurring"
+                                :class="editModal.shift.is_recurring ? 'bg-brand-600' : 'bg-gray-700'"
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                            <span :class="editModal.shift.is_recurring ? 'translate-x-5' : 'translate-x-0'"
+                                  class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+                        </button>
+                    </div>
+
+                    <!-- Recurrence Options -->
+                    <div x-show="editModal.shift.is_recurring" x-collapse class="space-y-4">
+                        <!-- Frequency -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-1.5">Repeats</label>
+                                <select x-model="editModal.shift.recurrence_rule.frequency"
+                                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-1.5">Every</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number"
+                                           x-model="editModal.shift.recurrence_rule.interval"
+                                           min="1"
+                                           max="52"
+                                           class="w-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                                    <span class="text-sm text-gray-400" x-text="{
+                                        'daily': editModal.shift.recurrence_rule.interval == 1 ? 'day' : 'days',
+                                        'weekly': editModal.shift.recurrence_rule.interval == 1 ? 'week' : 'weeks',
+                                        'monthly': editModal.shift.recurrence_rule.interval == 1 ? 'month' : 'months'
+                                    }[editModal.shift.recurrence_rule.frequency]"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Days of Week (for weekly) -->
+                        <div x-show="editModal.shift.recurrence_rule.frequency === 'weekly'" x-collapse>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">On these days</label>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="(day, index) in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']" :key="index">
+                                    <button type="button"
+                                            @click="toggleDayOfWeek(index)"
+                                            :class="editModal.shift.recurrence_rule.days_of_week?.includes(index) ? 'bg-brand-600 text-white border-brand-500' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-600'"
+                                            class="w-10 h-10 rounded-lg border text-sm font-medium transition-colors">
+                                        <span x-text="day.charAt(0)"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- End Condition -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Ends</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="radio"
+                                           x-model="editModal.recurrenceEndType"
+                                           value="never"
+                                           class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 focus:ring-brand-500">
+                                    <span class="text-sm text-gray-300">Never (extends automatically)</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="radio"
+                                           x-model="editModal.recurrenceEndType"
+                                           value="date"
+                                           class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 focus:ring-brand-500">
+                                    <span class="text-sm text-gray-300">On date</span>
+                                    <input type="date"
+                                           x-show="editModal.recurrenceEndType === 'date'"
+                                           x-model="editModal.shift.recurrence_rule.end_date"
+                                           :min="editModal.shift.date"
+                                           class="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="radio"
+                                           x-model="editModal.recurrenceEndType"
+                                           value="occurrences"
+                                           class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 focus:ring-brand-500">
+                                    <span class="text-sm text-gray-300">After</span>
+                                    <input type="number"
+                                           x-show="editModal.recurrenceEndType === 'occurrences'"
+                                           x-model="editModal.shift.recurrence_rule.end_after_occurrences"
+                                           min="1"
+                                           max="365"
+                                           class="w-16 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                                    <span x-show="editModal.recurrenceEndType === 'occurrences'" class="text-sm text-gray-300">occurrences</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Recurrence Errors -->
+                        <div x-show="editModal.errors.recurrence_rule" class="text-xs text-red-400">
+                            <p x-text="editModal.errors['recurrence_rule.frequency']?.[0]"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Scope (for existing recurring shifts) -->
+                <div x-show="!editModal.isCreateMode && (editModal.shift.is_recurring || editModal.shift.parent_shift_id)"
+                     class="border-t border-gray-700 pt-4 mt-4">
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Apply changes to</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio"
+                                   x-model="editModal.editScope"
+                                   value="single"
+                                   class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 focus:ring-brand-500">
+                            <div>
+                                <span class="text-sm text-gray-300">This shift only</span>
+                                <p class="text-xs text-gray-500">Detaches from series for individual changes</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio"
+                                   x-model="editModal.editScope"
+                                   value="future"
+                                   class="w-4 h-4 text-brand-600 bg-gray-800 border-gray-600 focus:ring-brand-500">
+                            <div>
+                                <span class="text-sm text-gray-300">This and all future shifts</span>
+                                <p class="text-xs text-gray-500">Updates time, break, notes, role, and assignment</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Footer Actions -->
                 <div class="flex items-center justify-between pt-4 border-t border-gray-700">
                     <!-- Delete Button (only in edit mode) -->
@@ -207,20 +341,33 @@
                             </button>
                         </template>
                         <template x-if="editModal.confirmDelete">
-                            <div class="flex items-center gap-2">
-                                <button type="button"
-                                        @click="editModal.deleteShift()"
-                                        :disabled="editModal.deleting"
-                                        class="px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50">
-                                    <span x-show="!editModal.deleting">Confirm</span>
-                                    <span x-show="editModal.deleting">Deleting...</span>
-                                </button>
-                                <button type="button"
-                                        @click="editModal.confirmDelete = false"
-                                        :disabled="editModal.deleting"
-                                        class="px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors">
-                                    Cancel
-                                </button>
+                            <div class="space-y-3">
+                                <!-- Delete scope for recurring shifts -->
+                                <div x-show="editModal.shift.is_recurring || editModal.shift.parent_shift_id" class="text-sm space-y-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" x-model="editModal.deleteScope" value="single" class="w-3 h-3 text-red-600 bg-gray-800 border-gray-600">
+                                        <span class="text-gray-300">Delete this shift only</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" x-model="editModal.deleteScope" value="future" class="w-3 h-3 text-red-600 bg-gray-800 border-gray-600">
+                                        <span class="text-gray-300">Delete this and all future shifts</span>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button"
+                                            @click="editModal.deleteShift()"
+                                            :disabled="editModal.deleting"
+                                            class="px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50">
+                                        <span x-show="!editModal.deleting">Confirm Delete</span>
+                                        <span x-show="editModal.deleting">Deleting...</span>
+                                    </button>
+                                    <button type="button"
+                                            @click="editModal.confirmDelete = false"
+                                            :disabled="editModal.deleting"
+                                            class="px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                         </template>
                     </div>

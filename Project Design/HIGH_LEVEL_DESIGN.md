@@ -104,12 +104,34 @@ Perfect your schedule before anyone sees it:
 
 ### Leave Request Management
 
-Streamline time-off requests:
+Streamline time-off requests with a comprehensive leave management system:
 
+**Leave Types:**
+- Configure custom leave types (Annual Leave, Sick Leave, Maternity, etc.)
+- Set whether each type requires approval or is auto-approved
+- Define whether leave is paid or unpaid
+- Assign colors for visual distinction on schedules
+- Set maximum consecutive days allowed per request
+
+**Leave Allowances:**
+- Track annual entitlements per employee per leave type
+- View used vs remaining days at a glance
+- Automatic deduction when leave is approved
+- Carry-over rules for unused leave (configurable)
+- Pro-rata calculations for part-year employees
+
+**Leave Calendar Integration:**
+- Approved leave displayed on schedule week and day views
+- Visual indicators show who is off on any given day
+- Prevents scheduling employees who are on approved leave
+- At-a-glance visibility for managers when planning shifts
+
+**Request Workflow:**
 - Employees submit requests through the platform
 - Managers review and approve with one click
 - Automatic calendar integration prevents scheduling conflicts
 - Complete audit trail of all requests and decisions
+- Email notifications for request status changes
 
 ### Shift Swap Requests
 
@@ -353,6 +375,36 @@ Save time by reusing proven schedule patterns:
 - Single day pattern
 - Shift-only (times without assignments)
 - Role-based (all waiters work these hours)
+
+### Recurring Shifts
+
+Create shifts that automatically repeat on a schedule:
+
+**Frequency Options:**
+- Daily (every day, every 2 days, etc.)
+- Weekly (select specific days: Mon/Wed/Fri)
+- Monthly (same date each month)
+
+**End Conditions:**
+- Never (auto-extends 12 weeks ahead)
+- On specific date
+- After N occurrences
+
+**Edit Scope:**
+- "This shift only" - Detaches from series
+- "This and all future shifts" - Bulk update
+
+**Delete Scope:**
+- "Delete this shift only" - Single removal
+- "Delete this and all future shifts" - Series deletion
+
+**Visual Indicators:**
+- Recurring icon on shift blocks
+- Parent/child relationship tracked in database
+
+**Automatic Extension:**
+- Daily command extends "never-ending" series
+- Maintains 12-week generation window
 
 ### Smart Fill (Auto-Scheduling Assistant)
 
@@ -760,6 +812,36 @@ Gain insights across your entire organization:
 - Identify best-performing locations and practices
 - Centralized compliance and attendance monitoring
 - Executive dashboards for leadership
+
+### Organization Settings
+
+Business Administrators can configure organization-wide settings to customize Plannrly for their business:
+
+**Scheduling Settings:**
+- Week start day (Sunday, Monday, etc.)
+- Default shift duration
+- Minimum time between shifts
+- Maximum hours per week warning threshold
+
+**Time & Attendance Settings:**
+- Enable/disable clock in/out features
+- Clock-in grace period (minutes before/after shift start)
+- Missed shift grace period
+- Require GPS location on clock-in
+- Auto clock-out time
+- Require manager approval for time entries
+
+**Display Settings:**
+- Date format preference
+- Time format (12-hour or 24-hour)
+- Timezone selection
+- Currency for cost calculations
+
+**Leave Management Settings:**
+- Leave year start date
+- Require approval for all leave types
+- Allow leave requests for past dates
+- Default notice period for leave requests
 
 ---
 
@@ -1581,7 +1663,7 @@ Comprehensive financial details for each tenant:
 - Payment terms (Net 7, Net 14, Net 30, etc.)
 - Purchase order required (yes/no)
 - Default PO number
-
+    
 **Bank Details (for refunds):**
 - Bank name
 - Account name
@@ -2143,11 +2225,15 @@ Empower employees to manage their own information:
 - Bid on preferred shifts
 - Coworker preferences (work with/avoid)
 
-**Personal Dashboard:**
-- Hours worked this week/month
-- Leave balance summary
-- Upcoming shifts at a glance
-- Attendance and punctuality stats (if tenant allows)
+**Employee Dashboard:**
+- Next shift countdown with role and location details
+- Clock in/out widget for quick time tracking (when enabled)
+- Upcoming shifts for the next 7 days with date, time, and role
+- Hours scheduled this week
+- Pending leave requests and their status
+- Active shift swap requests (sent and received)
+- Missed shift alerts with manager contact prompt
+- Quick actions for common tasks (request leave, view schedule, swap shifts)
 
 ---
 
@@ -2650,9 +2736,10 @@ Whether you're a single-location business or a multi-site enterprise, Plannrly a
 
 ---
 
-Document Version: 1.13
+Document Version: 1.14
 Last Updated: January 2026
 Changelog:
+- v1.14: Enhanced Leave Request Management (leave types, allowances, calendar integration), added Organization Settings section, enhanced Employee Dashboard description
 - v1.13: Added Billing & Dunning, Bulk Operations, Global Search, Employee Invitation/Onboarding, Advanced Shift Patterns (split, rotating, on-call, overnight, multi-day), Performance SLA Tiers, In-App Help & AI Chat, Tenant Branding Tiers, Full Timezone Support, Employee Offboarding, Configurable Approval Workflows, Employee Personal Insights, Public Holiday Management, Team Availability View, Urgent Shift Coverage, Native Mobile App Roadmap
 - v1.12: Added Data Retention & Archival (tenant-configurable), Multi-Channel Notifications (Slack, Teams, WhatsApp), Internationalization (6 EU languages), Offline PWA Support, Employee Self-Service Portal (documents, availability, preferences), Manager Delegation System, Team Messaging Suite (DMs, groups, announcements), Custom Report Builder
 - v1.11: Major feature expansion - Added Security (2FA, SSO, Session Management, Audit Logs, GDPR Compliance), Scheduling Enhancements (Shift Preferences, Calendar Integration, Open Shift Marketplace, Schedule Templates, Smart Fill, Real-Time Dashboard, Shift Notes, Conflict Detection, Working Time Compliance, Fairness Analytics, Absence Prediction), Business Model (Freemium Tier, Per-Employee Pricing, Professional Services, Partner Program), and Technical Features (Webhooks, API Rate Limiting, Competitor Import, Onboarding Wizard)

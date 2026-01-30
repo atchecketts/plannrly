@@ -62,9 +62,10 @@ class UpdateShiftRequest extends FormRequest
                     }
                 },
             ],
-            'date' => ['required', 'date'],
-            'start_time' => ['required', 'date_format:H:i'],
+            'date' => ['sometimes', 'required', 'date'],
+            'start_time' => ['sometimes', 'required', 'date_format:H:i'],
             'end_time' => [
+                'sometimes',
                 'required',
                 'date_format:H:i',
                 function ($attribute, $value, $fail) {
@@ -76,6 +77,15 @@ class UpdateShiftRequest extends FormRequest
             'break_duration_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'status' => ['sometimes', Rule::enum(ShiftStatus::class)],
+            'edit_scope' => ['sometimes', 'string', 'in:single,future'],
+            'is_recurring' => ['sometimes', 'boolean'],
+            'recurrence_rule' => ['nullable', 'array'],
+            'recurrence_rule.frequency' => ['required_if:is_recurring,true', 'in:daily,weekly,monthly'],
+            'recurrence_rule.interval' => ['nullable', 'integer', 'min:1', 'max:52'],
+            'recurrence_rule.days_of_week' => ['nullable', 'array'],
+            'recurrence_rule.days_of_week.*' => ['integer', 'min:0', 'max:6'],
+            'recurrence_rule.end_date' => ['nullable', 'date', 'after:date'],
+            'recurrence_rule.end_after_occurrences' => ['nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 
@@ -88,6 +98,14 @@ class UpdateShiftRequest extends FormRequest
             'date.required' => 'Please select a date.',
             'start_time.required' => 'Please enter a start time.',
             'end_time.required' => 'Please enter an end time.',
+            'edit_scope.in' => 'Invalid edit scope. Must be "single" or "future".',
+            'recurrence_rule.frequency.required_if' => 'Please select a recurrence frequency.',
+            'recurrence_rule.frequency.in' => 'Recurrence frequency must be daily, weekly, or monthly.',
+            'recurrence_rule.interval.min' => 'Recurrence interval must be at least 1.',
+            'recurrence_rule.interval.max' => 'Recurrence interval cannot exceed 52.',
+            'recurrence_rule.end_date.after' => 'End date must be after the shift date.',
+            'recurrence_rule.end_after_occurrences.min' => 'Must have at least 1 occurrence.',
+            'recurrence_rule.end_after_occurrences.max' => 'Cannot exceed 365 occurrences.',
         ];
     }
 

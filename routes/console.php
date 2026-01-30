@@ -10,3 +10,12 @@ Artisan::command('inspire', function () {
 
 // Run shift status updates every minute
 Schedule::command('shifts:update-statuses')->everyMinute();
+
+// Detect missed shifts and create time entries every 15 minutes
+Schedule::command('attendance:detect-missed-shifts')->everyFifteenMinutes();
+
+// Send shift reminders (day-before and hour-before)
+Schedule::command('shifts:send-reminders')->hourly();
+
+// Extend recurring shifts daily (creates future instances)
+Schedule::command('shifts:extend-recurring')->daily();

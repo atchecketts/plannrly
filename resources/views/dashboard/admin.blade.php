@@ -73,6 +73,26 @@
         </div>
     </div>
 
+    <!-- Missed Shifts Alert -->
+    @if(($stats['missed_shifts_today'] ?? 0) > 0)
+        <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div class="flex-1">
+                    <p class="font-semibold text-red-400">{{ $stats['missed_shifts_today'] }} Missed {{ Str::plural('Shift', $stats['missed_shifts_today']) }} Today</p>
+                    <p class="text-sm text-red-300/70">Employees did not clock in for their scheduled shifts.</p>
+                </div>
+                <a href="{{ route('timesheets.index') }}" class="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors">
+                    View Timesheets
+                </a>
+            </div>
+        </div>
+    @endif
+
     <!-- Action Cards & Alerts -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <!-- Pending Leave Requests -->
@@ -92,7 +112,7 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="font-medium text-white">{{ $leave->user->full_name }}</p>
-                                <p class="text-sm text-gray-500">{{ $leave->leaveType->name }} &bull; {{ $leave->start_date->format('M d') }}-{{ $leave->end_date->format('d') }}</p>
+                                <p class="text-sm text-gray-500">{{ $leave->leaveType?->name ?? 'Leave' }} &bull; {{ $leave->start_date->format('M d') }}-{{ $leave->end_date->format('d') }}</p>
                             </div>
                             <div class="flex gap-2">
                                 <form action="{{ route('leave-requests.review', $leave) }}" method="POST" class="inline">
@@ -159,7 +179,7 @@
                                     @endif
                                 </p>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ $swap->requestingShift->date->format('D') }} {{ $swap->requestingShift->start_time->format('g:i A') }}</p>
-                                <p class="text-xs text-gray-600 mt-0.5">{{ $swap->requestingShift->department->name }} &bull; {{ $swap->requestingShift->businessRole->name }}</p>
+                                <p class="text-xs text-gray-600 mt-0.5">{{ $swap->requestingShift->department?->name ?? 'No Dept' }} &bull; {{ $swap->requestingShift->businessRole?->name ?? 'No Role' }}</p>
                             </div>
                             <div class="flex gap-1">
                                 <form action="{{ route('shift-swaps.approve', $swap) }}" method="POST" class="inline">
@@ -290,7 +310,7 @@
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-white truncate">{{ $shift->user->full_name }}</p>
-                                                <p class="text-xs text-gray-500">{{ $shift->businessRole->name }}</p>
+                                                <p class="text-xs text-gray-500">{{ $shift->businessRole?->name ?? 'No Role' }}</p>
                                             </div>
                                         @else
                                             <div class="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center">
@@ -300,7 +320,7 @@
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-red-400">Unassigned</p>
-                                                <p class="text-xs text-gray-500">{{ $shift->businessRole->name }}</p>
+                                                <p class="text-xs text-gray-500">{{ $shift->businessRole?->name ?? 'No Role' }}</p>
                                             </div>
                                         @endif
                                         <div class="text-right">

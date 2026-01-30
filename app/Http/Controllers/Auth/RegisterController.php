@@ -29,7 +29,7 @@ class RegisterController extends Controller
         $result = DB::transaction(function () use ($data) {
             $tenant = Tenant::create([
                 'name' => $data['company_name'],
-                'slug' => Str::slug($data['company_name']) . '-' . Str::random(6),
+                'slug' => Str::slug($data['company_name']).'-'.Str::random(6),
                 'email' => $data['email'],
                 'settings' => [
                     'timezone' => 'UTC',

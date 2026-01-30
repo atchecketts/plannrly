@@ -24,6 +24,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 This project has domain-specific skills available. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
 
 - `tailwindcss-development` — Styles applications using Tailwind CSS v4 utilities. Activates when adding styles, restyling components, working with gradients, spacing, layout, flex, grid, responsive design, dark mode, colors, typography, or borders; or when the user mentions CSS, styling, classes, Tailwind, restyle, hero section, cards, buttons, or any visual/UI changes.
+- `mark-complete` — **AUTOMATIC**: Triggers automatically after implementing any numbered feature (3.5, 2.1, etc.). Updates all project documentation without user request. See Task Completion section for details.
 
 ## Conventions
 
@@ -37,6 +38,32 @@ This project has domain-specific skills available. You MUST activate the relevan
   1. Update relevant documentation in the `Project Design` folder, including HIGH_LEVEL_DESIGN.md, LOW_LEVEL_DESIGN.md and README.md
   2. Update or create UAT test cases in the `Project Design/UAT` folder
   3. Create or amend PHPUnit tests as necessary to cover the changes
+
+### AUTOMATIC: Numbered Feature Documentation Updates
+
+**CRITICAL**: When implementing ANY numbered feature (e.g., "implement Phase 3.5", "complete Feature 2.3"), you MUST automatically update ALL documentation after tests pass. Do NOT wait for the user to ask. This is a mandatory final step.
+
+After code is written and tests pass, IMMEDIATELY update:
+
+1. **Feature Document** (`Project Design/Implementation Plan/Features/X.X-*.md`)
+   - Set `**Status:** Complete` and `**Completed:** [Month Year]`
+   - Mark all task checkboxes as `[x]`
+
+2. **README** (`Project Design/README.md`) - Update ALL these sections:
+   - Quick Status counts
+   - "Fully Implemented" list - add the feature
+   - "Partially Implemented" - update or remove
+   - Phase Index table - update status (e.g., `🔵 5/8` or `✅ Complete`)
+   - Feature Summary table - change `⬜ Pending` to `✅ Done`
+   - Recommended Implementation Order - move to "Completed" with strikethrough
+
+3. **UAT Document** - Verify `Project Design/UAT/X.X-*-UAT.md` exists
+
+4. **HIGH_LEVEL_DESIGN.md** - Update if new user-facing functionality, workflows, or permissions were added
+
+5. **LOW_LEVEL_DESIGN.md** - Update if new tables, columns, or APIs were added
+
+See `.claude/skills/mark-complete/SKILL.md` for complete checklist.
 
 ## Verification Scripts
 

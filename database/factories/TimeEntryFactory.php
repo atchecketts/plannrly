@@ -28,6 +28,9 @@ class TimeEntryFactory extends Factory
             'clock_in_location' => null,
             'clock_out_location' => null,
             'status' => TimeEntryStatus::ClockedIn,
+            'approved_by' => null,
+            'approved_at' => null,
+            'adjustment_reason' => null,
         ];
     }
 
@@ -67,7 +70,38 @@ class TimeEntryFactory extends Factory
         ]);
     }
 
-    public function withLocation(float $lat = null, float $lng = null): static
+    public function approved(?User $approver = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'clock_in_at' => now()->subHours(8),
+            'clock_out_at' => now(),
+            'actual_break_minutes' => 30,
+            'status' => TimeEntryStatus::ClockedOut,
+            'approved_by' => $approver?->id ?? User::factory(),
+            'approved_at' => now(),
+        ]);
+    }
+
+    public function pendingApproval(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'clock_in_at' => now()->subHours(8),
+            'clock_out_at' => now(),
+            'actual_break_minutes' => 30,
+            'status' => TimeEntryStatus::ClockedOut,
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+    }
+
+    public function adjusted(string $reason = 'Manager adjustment for time correction.'): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'adjustment_reason' => $reason,
+        ]);
+    }
+
+    public function withLocation(?float $lat = null, ?float $lng = null): static
     {
         $location = [
             'lat' => $lat ?? fake()->latitude(),

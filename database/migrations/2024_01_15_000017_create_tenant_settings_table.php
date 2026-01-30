@@ -21,6 +21,10 @@ return new class extends Migration
             $table->string('time_format', 16)->default('H:i');
             $table->unsignedSmallInteger('missed_grace_minutes')->default(15);
             $table->boolean('notify_on_publish')->default(true);
+            $table->boolean('require_admin_approval_for_swaps')->default(true);
+            $table->string('leave_carryover_mode')->default('none');
+            $table->string('default_currency', 3)->default('GBP');
+            $table->string('primary_color', 7)->default('#6366f1');
             $table->timestamps();
         });
     }

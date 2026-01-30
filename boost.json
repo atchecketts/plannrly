@@ -2,11 +2,13 @@
     "agents": [
         "claude_code",
         "codex",
-        "phpstorm"
+        "junie"
     ],
-    "editors": [
-        "phpstorm"
-    ],
-    "guidelines": [],
-    "herd_mcp": true
+    "guidelines": true,
+    "herd_mcp": true,
+    "mcp": true,
+    "sail": false,
+    "skills": [
+        "tailwindcss-development"
+    ]
 }

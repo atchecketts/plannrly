@@ -37,6 +37,8 @@ class UpdateEmploymentDetailsRequest extends FormRequest
             'max_hours_per_week' => ['nullable', 'numeric', 'min:0', 'max:168', 'gte:min_hours_per_week'],
             'overtime_eligible' => ['boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'role_rates' => ['nullable', 'array'],
+            'role_rates.*' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
         ];
     }
 

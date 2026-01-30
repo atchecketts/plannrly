@@ -66,6 +66,13 @@ class ShiftSwapRequest extends Model
             'status' => SwapRequestStatus::Accepted,
             'responded_at' => now(),
         ]);
+
+        // Auto-execute swap if admin approval is not required
+        $tenant = Tenant::find($this->tenant_id);
+        $settings = $tenant?->tenantSettings;
+        if ($settings && ! $settings->require_admin_approval_for_swaps) {
+            $this->executeSwap();
+        }
     }
 
     public function reject(): void

@@ -5,8 +5,12 @@ namespace Tests\Feature;
 use App\Enums\EmploymentStatus;
 use App\Enums\PayType;
 use App\Enums\SystemRole;
+use App\Models\BusinessRole;
+use App\Models\Department;
+use App\Models\Location;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\UserBusinessRole;
 use App\Models\UserEmploymentDetails;
 use App\Models\UserRoleAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -177,6 +181,7 @@ class EmploymentDetailsTest extends TestCase
         $this->assertTrue($details->isLeavingSoon());
 
         $details->update(['final_working_date' => now()->addMonths(2)]);
+        $details->refresh();
         $this->assertFalse($details->isLeavingSoon(30));
     }
 
@@ -254,5 +259,215 @@ class EmploymentDetailsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Employment Details');
         $response->assertSee('Active');
+    }
+
+    public function test_employment_form_shows_role_specific_rates_section(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($this->admin);
+
+        $response = $this->get(route('users.employment.edit', $this->employee));
+
+        $response->assertOk();
+        $response->assertSee('Role-Specific Hourly Rates');
+        $response->assertSee($role->name);
+        $response->assertSee('Default: 15.00');
+    }
+
+    public function test_admin_can_set_role_specific_hourly_rate(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($this->admin);
+
+        $response = $this->put(route('users.employment.update', $this->employee), [
+            'employment_status' => EmploymentStatus::Active->value,
+            'pay_type' => PayType::Hourly->value,
+            'currency' => 'GBP',
+            'role_rates' => [
+                $role->id => 20.00,
+            ],
+        ]);
+
+        $response->assertRedirect(route('users.show', $this->employee));
+
+        $this->assertDatabaseHas('user_business_roles', [
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => 20.00,
+        ]);
+    }
+
+    public function test_clearing_role_rate_sets_it_to_null(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => 20.00,
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($this->admin);
+
+        $response = $this->put(route('users.employment.update', $this->employee), [
+            'employment_status' => EmploymentStatus::Active->value,
+            'pay_type' => PayType::Hourly->value,
+            'currency' => 'GBP',
+            'role_rates' => [
+                $role->id => '',
+            ],
+        ]);
+
+        $response->assertRedirect(route('users.show', $this->employee));
+
+        $this->assertDatabaseHas('user_business_roles', [
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => null,
+        ]);
+    }
+
+    public function test_effective_hourly_rate_returns_custom_rate_when_set(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        $userRole = UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => 25.00,
+            'is_primary' => true,
+        ]);
+
+        $this->assertEquals(25.00, $userRole->effective_hourly_rate);
+    }
+
+    public function test_effective_hourly_rate_falls_back_to_default_when_null(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        $userRole = UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => null,
+            'is_primary' => true,
+        ]);
+        $userRole->load('businessRole');
+
+        $this->assertEquals(15.00, $userRole->effective_hourly_rate);
+    }
+
+    public function test_user_show_page_displays_role_hourly_rates(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+            'default_hourly_rate' => 15.00,
+        ]);
+        UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'hourly_rate' => 22.50,
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($this->admin);
+
+        $response = $this->get(route('users.show', $this->employee));
+
+        $response->assertOk();
+        $response->assertSee($role->name);
+        $response->assertSee('22.50/hr');
+        $response->assertSee('Custom rate');
+    }
+
+    public function test_role_rate_validation_rejects_invalid_values(): void
+    {
+        $location = Location::factory()->create(['tenant_id' => $this->tenant->id]);
+        $department = Department::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'location_id' => $location->id,
+        ]);
+        $role = BusinessRole::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'department_id' => $department->id,
+        ]);
+        UserBusinessRole::create([
+            'user_id' => $this->employee->id,
+            'business_role_id' => $role->id,
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($this->admin);
+
+        $response = $this->put(route('users.employment.update', $this->employee), [
+            'employment_status' => EmploymentStatus::Active->value,
+            'pay_type' => PayType::Hourly->value,
+            'currency' => 'GBP',
+            'role_rates' => [
+                $role->id => -10.00,
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('role_rates.'.$role->id);
     }
 }

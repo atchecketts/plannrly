@@ -8,7 +8,9 @@ use App\Models\LeaveRequest;
 use App\Models\Location;
 use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
+use App\Models\StaffingRequirement;
 use App\Models\Tenant;
+use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserEmploymentDetails;
 use App\Observers\TenantObserver;
@@ -18,7 +20,9 @@ use App\Policies\LeaveRequestPolicy;
 use App\Policies\LocationPolicy;
 use App\Policies\ShiftPolicy;
 use App\Policies\ShiftSwapPolicy;
+use App\Policies\StaffingRequirementPolicy;
 use App\Policies\TenantPolicy;
+use App\Policies\TimeEntryPolicy;
 use App\Policies\UserEmploymentDetailsPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -44,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
         Gate::policy(ShiftSwapRequest::class, ShiftSwapPolicy::class);
         Gate::policy(UserEmploymentDetails::class, UserEmploymentDetailsPolicy::class);
+        Gate::policy(StaffingRequirement::class, StaffingRequirementPolicy::class);
+        Gate::policy(TimeEntry::class, TimeEntryPolicy::class);
     }
 
     protected function ensureDirectoriesExist(): void

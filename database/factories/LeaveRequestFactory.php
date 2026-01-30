@@ -16,7 +16,7 @@ class LeaveRequestFactory extends Factory
     public function definition(): array
     {
         $startDate = fake()->dateTimeBetween('now', '+2 months');
-        $endDate = (clone $startDate)->modify('+' . fake()->numberBetween(1, 5) . ' days');
+        $endDate = (clone $startDate)->modify('+'.fake()->numberBetween(1, 5).' days');
         $totalDays = $startDate->diff($endDate)->days + 1;
 
         return [
@@ -58,7 +58,7 @@ class LeaveRequestFactory extends Factory
         ]);
     }
 
-    public function approved(User $reviewer = null): static
+    public function approved(?User $reviewer = null): static
     {
         return $this->state(fn (array $attributes) => [
             'status' => LeaveRequestStatus::Approved,
@@ -67,7 +67,7 @@ class LeaveRequestFactory extends Factory
         ]);
     }
 
-    public function rejected(User $reviewer = null, string $notes = null): static
+    public function rejected(?User $reviewer = null, ?string $notes = null): static
     {
         return $this->state(fn (array $attributes) => [
             'status' => LeaveRequestStatus::Rejected,
@@ -85,6 +85,22 @@ class LeaveRequestFactory extends Factory
             'start_date' => $startDate,
             'end_date' => $endDate,
             'total_days' => $totalDays,
+        ]);
+    }
+
+    public function startHalfDay(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'start_half_day' => true,
+            'total_days' => max(0.5, ($attributes['total_days'] ?? 1) - 0.5),
+        ]);
+    }
+
+    public function endHalfDay(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'end_half_day' => true,
+            'total_days' => max(0.5, ($attributes['total_days'] ?? 1) - 0.5),
         ]);
     }
 }

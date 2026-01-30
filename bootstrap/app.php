@@ -3,6 +3,7 @@
 use App\Http\Middleware\CheckSystemRole;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\RequiresFeature;
 use App\Http\Middleware\SetTenantContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => EnsureTenantAccess::class,
             'role' => CheckSystemRole::class,
             'super-admin' => EnsureSuperAdmin::class,
+            'requires-feature' => RequiresFeature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

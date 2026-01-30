@@ -112,4 +112,80 @@ class ShiftFactory extends Factory
             'status' => ShiftStatus::Cancelled,
         ]);
     }
+
+    /**
+     * Configure the shift as a recurring parent (template).
+     */
+    public function recurring(string $frequency = 'weekly', int $interval = 1, ?array $daysOfWeek = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_recurring' => true,
+            'recurrence_rule' => [
+                'frequency' => $frequency,
+                'interval' => $interval,
+                'days_of_week' => $daysOfWeek ?? [1], // Default to Monday
+                'end_date' => null,
+                'end_after_occurrences' => null,
+            ],
+            'parent_shift_id' => null,
+        ]);
+    }
+
+    /**
+     * Configure the shift as a recurring child with end date.
+     */
+    public function recurringWithEndDate(string $endDate, string $frequency = 'weekly', int $interval = 1): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_recurring' => true,
+            'recurrence_rule' => [
+                'frequency' => $frequency,
+                'interval' => $interval,
+                'days_of_week' => [1],
+                'end_date' => $endDate,
+                'end_after_occurrences' => null,
+            ],
+            'parent_shift_id' => null,
+        ]);
+    }
+
+    /**
+     * Configure the shift as a recurring child with occurrence limit.
+     */
+    public function recurringWithOccurrences(int $occurrences, string $frequency = 'weekly', int $interval = 1): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_recurring' => true,
+            'recurrence_rule' => [
+                'frequency' => $frequency,
+                'interval' => $interval,
+                'days_of_week' => [1],
+                'end_date' => null,
+                'end_after_occurrences' => $occurrences,
+            ],
+            'parent_shift_id' => null,
+        ]);
+    }
+
+    /**
+     * Configure the shift as a child of a recurring parent.
+     */
+    public function childOf(\App\Models\Shift $parentShift): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'tenant_id' => $parentShift->tenant_id,
+            'location_id' => $parentShift->location_id,
+            'department_id' => $parentShift->department_id,
+            'business_role_id' => $parentShift->business_role_id,
+            'user_id' => $parentShift->user_id,
+            'start_time' => $parentShift->start_time->format('H:i'),
+            'end_time' => $parentShift->end_time->format('H:i'),
+            'break_duration_minutes' => $parentShift->break_duration_minutes,
+            'status' => $parentShift->status,
+            'is_recurring' => false,
+            'recurrence_rule' => null,
+            'parent_shift_id' => $parentShift->id,
+            'created_by' => $parentShift->created_by,
+        ]);
+    }
 }

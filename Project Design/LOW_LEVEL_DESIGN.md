@@ -1498,6 +1498,7 @@ enum FeatureAddon: string
     case AdvancedAnalytics = 'advanced_analytics';
     case ApiAccess = 'api_access';
     case PrioritySupport = 'priority_support';
+    case TimeAttendance = 'time_attendance';  // $12/mo addon for Professional, included in Enterprise
 }
 ```
 
@@ -1876,6 +1877,82 @@ public function getIsLateAttribute(): bool
     $shiftStart = $this->shift->getStartDateTime();
 
     return $this->clock_in_at->gt($shiftStart->addMinutes($gracePeriod));
+}
+```
+
+### 2.8.1 Missed Shift Detection Command
+
+Automatically detects shifts where employees failed to clock in and creates missed time entries.
+
+```php
+// app/Console/Commands/DetectMissedShiftsCommand.php
+class DetectMissedShiftsCommand extends Command
+{
+    protected $signature = 'attendance:detect-missed-shifts';
+    protected $description = 'Detect shifts where employees failed to clock in';
+
+    public function handle(): int
+    {
+        // Process each tenant with clock-in enabled
+        Tenant::whereHas('tenantSettings', function ($q) {
+            $q->where('enable_clock_in_out', true);
+        })->each(function ($tenant) {
+            $this->processTenant($tenant);
+        });
+
+        return Command::SUCCESS;
+    }
+
+    private function processTenant(Tenant $tenant): void
+    {
+        $gracePeriod = $tenant->tenantSettings->missed_grace_minutes ?? 15;
+        $cutoffTime = now()->subMinutes($gracePeriod);
+
+        // Find published shifts that have started, assigned to users, with no time entry
+        $missedShifts = Shift::where('tenant_id', $tenant->id)
+            ->where('status', ShiftStatus::Published)
+            ->whereNotNull('user_id')
+            ->where('date', '<=', today())
+            ->whereRaw("CONCAT(date, ' ', start_time) <= ?", [$cutoffTime])
+            ->whereDoesntHave('timeEntries')
+            ->get();
+
+        foreach ($missedShifts as $shift) {
+            $this->createMissedEntry($shift);
+            $this->notifyManagers($shift);
+        }
+    }
+}
+```
+
+**Scheduler Registration (routes/console.php):**
+```php
+Schedule::command('attendance:detect-missed-shifts')->everyFifteenMinutes();
+```
+
+**MissedShiftNotification:**
+```php
+// app/Notifications/MissedShiftNotification.php
+class MissedShiftNotification extends Notification
+{
+    use Queueable;
+
+    public function __construct(public Shift $shift) {}
+
+    public function via($notifiable): array
+    {
+        return ['mail', 'database'];
+    }
+
+    public function toMail($notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject('Missed Shift Alert: ' . $this->shift->user->full_name)
+            ->line("{$this->shift->user->full_name} did not clock in for their shift.")
+            ->line("Date: {$this->shift->date->format('D, M j, Y')}")
+            ->line("Time: {$this->shift->formatted_time}")
+            ->action('View Timesheets', route('timesheets.index'));
+    }
 }
 ```
 
@@ -2856,6 +2933,266 @@ Route::prefix('coverage')->group(function () {
     Route::get('analyze', [CoverageController::class, 'analyze']);
     Route::get('day/{date}', [CoverageController::class, 'day']);
 });
+```
+
+---
+
+## 2.14.1 Attendance Report Service
+
+Comprehensive attendance reporting and analytics for managers.
+
+```php
+class AttendanceReportService
+{
+    /**
+     * Get attendance rate: (shifts worked / shifts scheduled) x 100
+     * @return array{rate: float, worked: int, scheduled: int}
+     */
+    public function getAttendanceRate(
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $departmentId = null,
+        ?int $locationId = null,
+        ?int $userId = null
+    ): array;
+
+    /**
+     * Get punctuality rate: (on-time arrivals / total arrivals) x 100
+     * @return array{rate: float, on_time: int, late: int, early: int, total: int}
+     */
+    public function getPunctualityRate(
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $departmentId = null,
+        ?int $locationId = null,
+        ?int $userId = null
+    ): array;
+
+    /**
+     * Get overtime hours: sum of positive variances
+     * @return array{hours: float, minutes: int, entries: int}
+     */
+    public function getOvertimeHours(
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $departmentId = null,
+        ?int $locationId = null,
+        ?int $userId = null
+    ): array;
+
+    /**
+     * Get undertime hours: sum of negative variances
+     */
+    public function getUndertimeHours(...): array;
+
+    /**
+     * Get missed shifts (no-shows)
+     * @return array{count: int, entries: Collection}
+     */
+    public function getMissedShifts(...): array;
+
+    /**
+     * Get employee summary for the given period
+     */
+    public function getEmployeeSummary(
+        int $employeeId,
+        Carbon $startDate,
+        Carbon $endDate
+    ): array;
+
+    /**
+     * Get department summary for the given period
+     */
+    public function getDepartmentSummary(
+        int $departmentId,
+        Carbon $startDate,
+        Carbon $endDate
+    ): array;
+
+    /**
+     * Generate detailed report data
+     */
+    public function generatePunctualityReport(...): array;
+    public function generateHoursWorkedReport(...): array;
+    public function generateOvertimeReport(...): array;
+    public function generateAbsenceReport(...): array;
+    public function generateAttendanceSummary(...): array;
+
+    /**
+     * Export report data to CSV format
+     */
+    public function exportToCsv(string $reportType, array $reportData): string;
+}
+```
+
+### Report Calculations
+
+**Attendance Rate:**
+```
+Attendance Rate = (TimeEntries with clock_in_at / Scheduled Shifts with user_id) × 100
+```
+
+**Punctuality Rate:**
+```
+On-time = clock_in_variance_minutes <= grace_period (default 15 min)
+Late = clock_in_variance_minutes > grace_period
+Early = clock_in_variance_minutes < -5 minutes
+Punctuality Rate = (On-time / Total Arrivals) × 100
+```
+
+**Variance Calculations:**
+- Uses TimeEntry model accessors: `variance_minutes`, `clock_in_variance_minutes`, `clock_out_variance_minutes`
+- Positive variance = overtime/late
+- Negative variance = undertime/early
+
+### Authorization
+
+Reports require `viewReports` policy permission on User model:
+- SuperAdmin: Can view all
+- Admin: Can view all in tenant
+- LocationAdmin: Can view within managed locations
+- DepartmentAdmin: Can view within managed departments
+- Employee: No access (403 Forbidden)
+
+---
+
+## 2.14.2 Recurring Shift Service
+
+Manages creation, modification, and extension of recurring shift patterns.
+
+```php
+class RecurringShiftService
+{
+    /**
+     * Default generation window in weeks
+     */
+    protected int $generationWeeks = 12;
+
+    /**
+     * Generate child shift instances from a recurring parent shift.
+     * Called immediately when creating a new recurring shift.
+     * @return Collection<int, Shift>
+     */
+    public function generateInstances(Shift $parentShift): Collection;
+
+    /**
+     * Calculate all occurrence dates based on recurrence rule.
+     * Handles daily, weekly (with days of week), and monthly frequencies.
+     * @return Collection<int, Carbon>
+     */
+    public function calculateOccurrenceDates(Shift $parentShift): Collection;
+
+    /**
+     * Update all future child instances of a recurring shift.
+     * Used when edit_scope is 'future'.
+     */
+    public function updateFutureInstances(Shift $parentShift, array $data): int;
+
+    /**
+     * Delete all future child instances of a recurring shift.
+     * Used when delete_scope is 'future'.
+     */
+    public function deleteFutureInstances(Shift $parentShift): int;
+
+    /**
+     * Detach a child shift from its parent for individual editing.
+     * Sets parent_shift_id to null.
+     */
+    public function detachFromParent(Shift $childShift): Shift;
+
+    /**
+     * Extend recurring shifts approaching their generation window end.
+     * Called by daily scheduled command: shifts:extend-recurring
+     */
+    public function extendRecurringShifts(): int;
+
+    /**
+     * Set the generation window in weeks.
+     */
+    public function setGenerationWeeks(int $weeks): self;
+}
+```
+
+### Recurrence Rule Schema
+
+```json
+{
+    "frequency": "weekly",     // daily, weekly, monthly
+    "interval": 1,             // Every N days/weeks/months
+    "days_of_week": [1, 3, 5], // 0=Sun through 6=Sat (weekly only)
+    "end_date": "2026-06-30",  // Optional: hard end date
+    "end_after_occurrences": 52 // Optional: limit number of instances
+}
+```
+
+### API Endpoints
+
+**Create Recurring Shift:**
+```
+POST /shifts
+{
+    "location_id": 1,
+    "department_id": 1,
+    "business_role_id": 1,
+    "user_id": null,
+    "date": "2026-02-03",
+    "start_time": "09:00",
+    "end_time": "17:00",
+    "is_recurring": true,
+    "recurrence_rule": {
+        "frequency": "weekly",
+        "interval": 1,
+        "days_of_week": [1, 3, 5],
+        "end_after_occurrences": 12
+    }
+}
+```
+
+**Update with Scope:**
+```
+PUT /shifts/{id}
+{
+    "start_time": "08:00",
+    "end_time": "16:00",
+    "edit_scope": "future"  // 'single' or 'future'
+}
+```
+
+**Delete with Scope:**
+```
+DELETE /shifts/{id}?delete_scope=future  // 'single' or 'future'
+```
+
+### Shift Model Helpers
+
+```php
+// Check if shift is recurring parent (template)
+$shift->isRecurringParent(): bool
+
+// Check if shift is child of recurring parent
+$shift->isRecurringChild(): bool
+
+// Check if shift has children
+$shift->hasChildren(): bool
+
+// Get future children from today onwards
+$shift->getFutureChildren(): Collection
+
+// Scope: only recurring parents
+Shift::recurringParents()->get()
+
+// Scope: only recurring children
+Shift::recurringChildren()->get()
+
+// Get human-readable recurrence label
+$shift->recurrence_frequency_label  // "Weekly on Mon, Wed, Fri"
+```
+
+### Scheduled Command
+
+```php
+// routes/console.php
+Schedule::command('shifts:extend-recurring')->daily();
 ```
 
 ---
@@ -11568,6 +11905,68 @@ if ($endMin <= $startMin) {
 ```
 
 **Note:** The `group_by` value is stored in the `additional_filters` JSON column and retrieved via the `getFilter()` helper method on the model.
+
+#### Time Entry Routes
+
+| Method | URI | Controller | Description |
+|--------|-----|------------|-------------|
+| GET | /time-entries | TimeEntryController@index | List time entries (admin: all, employee: own) |
+| GET | /time-entries/{timeEntry} | TimeEntryController@show | View time entry details |
+| POST | /time-entries/clock-in | TimeEntryController@clockIn | Employee clocks in |
+| POST | /time-entries/clock-out | TimeEntryController@clockOut | Employee clocks out |
+| POST | /time-entries/start-break | TimeEntryController@startBreak | Start break |
+| POST | /time-entries/end-break | TimeEntryController@endBreak | End break |
+| PUT | /time-entries/{timeEntry} | TimeEntryController@update | Manager adjusts time entry |
+| POST | /time-entries/{timeEntry}/approve | TimeEntryController@approve | Manager approves entry |
+
+**AJAX Endpoints (Clock Widget):**
+| Method | URI | Response | Description |
+|--------|-----|----------|-------------|
+| GET | /time-entries/current-status | JSON | Get employee's current clock status |
+| POST | /time-entries/clock-in | JSON | AJAX clock in with GPS |
+| POST | /time-entries/clock-out | JSON | AJAX clock out with GPS |
+| POST | /time-entries/start-break | JSON | AJAX start break |
+| POST | /time-entries/end-break | JSON | AJAX end break |
+
+#### Timesheet Routes
+
+| Method | URI | Controller | Description |
+|--------|-----|------------|-------------|
+| GET | /timesheets | TimesheetController@index | Admin weekly timesheet view |
+| GET | /timesheets?week_start=YYYY-MM-DD | TimesheetController@index | View specific week |
+| GET | /timesheets/employee | TimesheetController@employee | Employee's own timesheet |
+| POST | /timesheets/approve | TimesheetController@batchApprove | Batch approve time entries |
+
+**Timesheet Query Parameters:**
+- `week_start` - Start date of week to view (defaults to current week)
+- `location_id` - Filter by location
+- `department_id` - Filter by department
+- `user_id` - Filter by specific user
+
+#### Attendance Report Routes
+
+| Method | URI | Controller | Description |
+|--------|-----|------------|-------------|
+| GET | /reports/attendance | AttendanceReportController@index | Summary dashboard |
+| GET | /reports/attendance/punctuality | AttendanceReportController@punctuality | Punctuality report |
+| GET | /reports/attendance/hours | AttendanceReportController@hours | Hours worked report |
+| GET | /reports/attendance/overtime | AttendanceReportController@overtime | Overtime report |
+| GET | /reports/attendance/absence | AttendanceReportController@absence | Absence/no-show report |
+| GET | /reports/attendance/employee/{user} | AttendanceReportController@employee | Individual employee report |
+| GET | /reports/attendance/department/{department} | AttendanceReportController@department | Department report |
+| GET | /reports/attendance/export/{type} | AttendanceReportController@export | Export to CSV |
+
+**Report Query Parameters:**
+- `start_date` - Start of date range (defaults to first of current month)
+- `end_date` - End of date range (defaults to today)
+- `department_id` - Filter by department
+- `location_id` - Filter by location
+
+**Export Types:**
+- `punctuality` - Punctuality report CSV
+- `hours` - Hours worked report CSV
+- `overtime` - Overtime report CSV
+- `absence` - Absence report CSV
 
 ### 6.2 API Routes (v1 - Placeholder)
 

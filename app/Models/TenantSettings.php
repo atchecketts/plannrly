@@ -22,6 +22,20 @@ class TenantSettings extends Model
         'time_format',
         'missed_grace_minutes',
         'notify_on_publish',
+        'require_admin_approval_for_swaps',
+        'leave_carryover_mode',
+        'default_currency',
+        'primary_color',
+        'clock_in_grace_minutes',
+        'require_gps_clock_in',
+        'auto_clock_out_enabled',
+        'auto_clock_out_time',
+        'overtime_threshold_minutes',
+        'require_manager_approval',
+        'enable_shift_reminders',
+        'remind_day_before',
+        'remind_hours_before',
+        'remind_hours_before_value',
     ];
 
     protected function casts(): array
@@ -34,6 +48,16 @@ class TenantSettings extends Model
             'week_starts_on' => 'integer',
             'missed_grace_minutes' => 'integer',
             'notify_on_publish' => 'boolean',
+            'require_admin_approval_for_swaps' => 'boolean',
+            'clock_in_grace_minutes' => 'integer',
+            'require_gps_clock_in' => 'boolean',
+            'auto_clock_out_enabled' => 'boolean',
+            'overtime_threshold_minutes' => 'integer',
+            'require_manager_approval' => 'boolean',
+            'enable_shift_reminders' => 'boolean',
+            'remind_day_before' => 'boolean',
+            'remind_hours_before' => 'boolean',
+            'remind_hours_before_value' => 'integer',
         ];
     }
 

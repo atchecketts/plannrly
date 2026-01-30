@@ -181,6 +181,43 @@
                 </div>
             </div>
 
+            {{-- Role-Specific Hourly Rates --}}
+            @if($user->userBusinessRoles->isNotEmpty())
+                <div class="bg-gray-900 rounded-lg border border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-800">
+                        <h3 class="text-base font-semibold text-white">Role-Specific Hourly Rates</h3>
+                        <p class="text-sm text-gray-400">Set custom hourly rates per role. Leave blank to use the role's default rate.</p>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        @foreach($user->userBusinessRoles as $userRole)
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-white">
+                                        {{ $userRole->businessRole->name }}
+                                        @if($userRole->is_primary)
+                                            <span class="ml-2 inline-flex items-center rounded bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-400">Primary</span>
+                                        @endif
+                                    </p>
+                                    <p class="text-xs text-gray-400">
+                                        Default: {{ $userRole->businessRole->default_hourly_rate ? number_format($userRole->businessRole->default_hourly_rate, 2) : 'Not set' }}
+                                    </p>
+                                </div>
+                                <div class="w-32">
+                                    <x-form.input
+                                        name="role_rates[{{ $userRole->business_role_id }}]"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        :value="old('role_rates.' . $userRole->business_role_id, $userRole->hourly_rate)"
+                                        placeholder="Use default"
+                                    />
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- HR Notes --}}
             <div class="bg-gray-900 rounded-lg border border-gray-800">
                 <div class="px-6 py-4 border-b border-gray-800">

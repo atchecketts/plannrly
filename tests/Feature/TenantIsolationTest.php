@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\Department;
+use App\Enums\SystemRole;
 use App\Models\Location;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserRoleAssignment;
-use App\Enums\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

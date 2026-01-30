@@ -108,13 +108,14 @@ class AvailabilityTest extends TestCase
         $response->assertRedirect(route('availability.index'));
         $response->assertSessionHas('success');
 
-        $this->assertDatabaseHas('user_availability', [
-            'user_id' => $this->employee->id,
-            'type' => 'specific_date',
-            'specific_date' => $specificDate,
-            'preference_level' => 'unavailable',
-            'notes' => 'Doctor appointment',
-        ]);
+        $availability = \App\Models\UserAvailability::where('user_id', $this->employee->id)
+            ->where('type', 'specific_date')
+            ->where('preference_level', 'unavailable')
+            ->where('notes', 'Doctor appointment')
+            ->first();
+
+        $this->assertNotNull($availability);
+        $this->assertEquals($specificDate, $availability->specific_date->format('Y-m-d'));
     }
 
     public function test_employee_can_delete_availability(): void

@@ -14,7 +14,7 @@ class LocationFactory extends Factory
     {
         return [
             'tenant_id' => Tenant::factory(),
-            'name' => fake()->city() . ' ' . fake()->randomElement(['Office', 'Branch', 'Store', 'Warehouse', 'HQ']),
+            'name' => fake()->city().' '.fake()->randomElement(['Office', 'Branch', 'Store', 'Warehouse', 'HQ']),
             'address_line_1' => fake()->streetAddress(),
             'address_line_2' => fake()->optional()->secondaryAddress(),
             'city' => fake()->city(),

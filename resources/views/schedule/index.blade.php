@@ -59,6 +59,23 @@
             }
             return false;
         };
+
+        // Helper to check if current user can request swap for a shift
+        $canRequestSwap = function($shift) {
+            $user = auth()->user();
+            // Must be the shift owner
+            if ($shift->user_id !== $user->id) {
+                return false;
+            }
+            // Must be published and in the future
+            if (!$shift->status->isPublished()) {
+                return false;
+            }
+            if ($shift->date->isPast()) {
+                return false;
+            }
+            return true;
+        };
     @endphp
 
     <div x-data="scheduleApp()" x-init="init()"
@@ -220,6 +237,69 @@
             </div>
         </div>
 
+        <!-- Coverage Summary (Admin Only) -->
+        @if(!auth()->user()->isEmployee() && $coverageSummary && $coverageSummary['total'] > 0)
+            <div class="mb-6" x-data="{ showCoverageDetails: false }">
+                <div class="bg-gray-900 rounded-lg border border-gray-800 p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <h3 class="text-sm font-medium text-gray-300">Coverage Status</h3>
+                            @if($coverageSummary['understaffed'] > 0 || $coverageSummary['overstaffed'] > 0)
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    {{ $coverageSummary['understaffed'] + $coverageSummary['overstaffed'] }} {{ str('issue')->plural($coverageSummary['understaffed'] + $coverageSummary['overstaffed']) }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-green-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    All covered
+                                </span>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3 text-sm">
+                                @if($coverageSummary['understaffed'] > 0)
+                                    <span class="text-red-400">{{ $coverageSummary['understaffed'] }} understaffed</span>
+                                @endif
+                                @if($coverageSummary['overstaffed'] > 0)
+                                    <span class="text-yellow-400">{{ $coverageSummary['overstaffed'] }} overstaffed</span>
+                                @endif
+                                @if($coverageSummary['adequate'] > 0)
+                                    <span class="text-green-400">{{ $coverageSummary['adequate'] }} adequate</span>
+                                @endif
+                            </div>
+                            @if($coverageIssues->isNotEmpty())
+                                <button @click="showCoverageDetails = !showCoverageDetails" class="text-sm text-brand-400 hover:text-brand-300">
+                                    <span x-text="showCoverageDetails ? 'Hide Details' : 'Show Details'"></span>
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if($coverageIssues->isNotEmpty())
+                        <div x-show="showCoverageDetails" x-cloak class="mt-4 pt-4 border-t border-gray-800">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                @foreach($coverageIssues->take(9) as $issue)
+                                    <div class="flex items-center gap-2 text-sm {{ $issue->status->value === 'understaffed' ? 'text-red-400' : 'text-yellow-400' }}">
+                                        <x-coverage-indicator :status="$issue->status" :scheduled="$issue->scheduled" :min="$issue->minRequired" :max="$issue->maxAllowed" :showTooltip="false" />
+                                        <span>{{ $issue->businessRoleName ?? 'Role' }}</span>
+                                        <span class="text-gray-500">{{ $issue->date?->format('D') }} {{ $issue->startTime }}-{{ $issue->endTime }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if($coverageIssues->count() > 9)
+                                <p class="mt-2 text-xs text-gray-500">+ {{ $coverageIssues->count() - 9 }} more issues</p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <!-- Schedule Grid -->
         <div class="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
             <div class="overflow-x-auto">
@@ -296,13 +376,21 @@
                                                  draggable="true"
                                                  @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                  @dragend="handleDragEnd($event)"
-                                                 @click.stop="editModal.open({{ $shift->id }})"
+                                                 @click.stop="selectShift({{ $shift->id }}); editModal.open({{ $shift->id }})"
+                                                 @contextmenu.prevent="showContextMenu($event, 'shift', { shiftId: {{ $shift->id }}, date: '{{ $dateStr }}', userId: null, locationId: {{ $shift->location_id }}, departmentId: {{ $shift->department_id }} })"
                                                  @endif>
                                                 @if($shift->isDraft())
                                                     <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                 @endif
                                                 <div class="shift-times font-medium flex items-center justify-between">
-                                                    <span>{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                    <span class="flex items-center gap-1">
+                                                        @if($shift->isRecurringParent() || $shift->isRecurringChild())
+                                                            <svg class="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Recurring shift">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                            </svg>
+                                                        @endif
+                                                        {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                    </span>
                                                     <span class="text-white/60">{{ $shift->duration_hours }} hrs</span>
                                                 </div>
                                                 <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
@@ -312,7 +400,8 @@
                                 @elseif($canEditShifts)
                                     <!-- Empty Cell - Add Unassigned Shift Placeholder -->
                                     <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-amber-700/50 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 hover:bg-amber-500/10 transition-colors"
-                                         @click.stop="editModal.create(null, '{{ $dateStr }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})">
+                                         @click.stop="editModal.create(null, '{{ $dateStr }}', {{ $locations->first()?->id ?? 'null' }}, {{ $departments->first()?->id ?? 'null' }})"
+                                         @contextmenu.prevent="showContextMenu($event, 'cell', { date: '{{ $dateStr }}', userId: null, locationId: {{ $locations->first()?->id ?? 'null' }}, departmentId: {{ $departments->first()?->id ?? 'null' }} })">
                                         <svg class="w-5 h-5 text-amber-600/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                         </svg>
@@ -392,16 +481,44 @@
                                              @endif>
 
                                             @if($leave)
+                                                @php
+                                                    $leaveColor = $leave->leaveType->color ?? '#f59e0b';
+                                                    $currentDate = \Carbon\Carbon::parse($dateStr);
+                                                    $isStartDate = $currentDate->isSameDay($leave->start_date);
+                                                    $isEndDate = $currentDate->isSameDay($leave->end_date);
+                                                    $showAmOnly = $isEndDate && $leave->end_half_day;
+                                                    $showPmOnly = $isStartDate && $leave->start_half_day;
+                                                @endphp
                                                 <!-- Leave Block -->
-                                                <div class="bg-amber-500/20 border border-amber-500/50 rounded-lg p-2 text-xs">
-                                                    <div class="font-medium text-amber-400">{{ $leave->leaveType->name ?? 'Leave' }}</div>
+                                                <div class="rounded-lg text-xs overflow-hidden h-full min-h-[40px] flex" style="border: 1px solid {{ $leaveColor }}80;">
+                                                    @if($showPmOnly)
+                                                        {{-- Start date with half day: only PM (right half) is on leave --}}
+                                                        <div class="w-1/2"></div>
+                                                        <div class="w-1/2 flex items-center justify-center p-1" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium text-xs truncate" style="color: {{ $leaveColor }};">PM</span>
+                                                        </div>
+                                                    @elseif($showAmOnly)
+                                                        {{-- End date with half day: only AM (left half) is on leave --}}
+                                                        <div class="w-1/2 flex items-center justify-center p-1" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium text-xs truncate" style="color: {{ $leaveColor }};">AM</span>
+                                                        </div>
+                                                        <div class="w-1/2"></div>
+                                                    @else
+                                                        {{-- Full day leave --}}
+                                                        <div class="w-full flex items-center justify-center p-2" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium truncate" style="color: {{ $leaveColor }};">{{ $leave->leaveType->name ?? 'Leave' }}</span>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             @elseif(count($userShifts) > 0)
                                                 <div class="space-y-1">
                                                     @foreach($userShifts as $shift)
-                                                        @php $shiftEditable = $isShiftEditable($shift); @endphp
+                                                        @php
+                                                            $shiftEditable = $isShiftEditable($shift);
+                                                            $shiftSwappable = $canRequestSwap($shift);
+                                                        @endphp
                                                         <!-- Shift Block -->
-                                                        <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                        <div class="shift-block group/shift relative text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : ($shiftSwappable ? 'cursor-pointer' : 'cursor-default') }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                              style="background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                              data-shift-id="{{ $shift->id }}"
                                                              data-user-id="{{ $user->id }}"
@@ -409,20 +526,43 @@
                                                              data-status="{{ $shift->status->value }}"
                                                              data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                              data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                             data-location-id="{{ $shift->location_id }}"
+                                                             data-department-id="{{ $shift->department_id }}"
+                                                             data-role-id="{{ $shift->business_role_id }}"
                                                              @if($shiftEditable)
                                                              draggable="true"
                                                              @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                              @dragend="handleDragEnd($event)"
-                                                             @click.stop="editModal.open({{ $shift->id }})"
+                                                             @click.stop="selectShift({{ $shift->id }}); editModal.open({{ $shift->id }})"
+                                                             @contextmenu.prevent="showContextMenu($event, 'shift', { shiftId: {{ $shift->id }}, date: '{{ $dateStr }}', userId: {{ $user->id }}, locationId: {{ $shift->location_id }}, departmentId: {{ $shift->department_id }} })"
                                                              @endif>
                                                             @if($shift->isDraft())
                                                                 <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                             @endif
                                                             <div class="shift-times font-medium flex items-center justify-between">
-                                                                <span>{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                                <span class="flex items-center gap-1">
+                                                                    @if($shift->isRecurringParent() || $shift->isRecurringChild())
+                                                                        <svg class="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Recurring shift">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                        </svg>
+                                                                    @endif
+                                                                    {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                                </span>
                                                                 <span class="text-white/60">{{ $shift->duration_hours }} hrs</span>
                                                             </div>
                                                             <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
+                                                            @if($shiftSwappable && !$shiftEditable)
+                                                            <a href="{{ route('shift-swaps.create', $shift) }}"
+                                                               class="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/shift:opacity-100 transition-opacity rounded-lg"
+                                                               title="Request Swap">
+                                                                <span class="flex items-center gap-1 text-white text-[10px] font-medium">
+                                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                                    </svg>
+                                                                    Swap
+                                                                </span>
+                                                            </a>
+                                                            @endif
                                                         </div>
                                                     @endforeach
                                                     @if($cellEditable)
@@ -438,7 +578,8 @@
                                             @elseif($cellEditable)
                                                 <!-- Empty Cell - Add Shift Placeholder -->
                                                 <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
-                                                     @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $department->location_id }}, {{ $department->id }})">
+                                                     @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $department->location_id }}, {{ $department->id }})"
+                                                     @contextmenu.prevent="showContextMenu($event, 'cell', { date: '{{ $dateStr }}', userId: {{ $user->id }}, locationId: {{ $department->location_id }}, departmentId: {{ $department->id }} })">
                                                     <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                     </svg>
@@ -527,16 +668,44 @@
                                              @endif>
 
                                             @if($leave)
+                                                @php
+                                                    $leaveColor = $leave->leaveType->color ?? '#f59e0b';
+                                                    $currentDate = \Carbon\Carbon::parse($dateStr);
+                                                    $isStartDate = $currentDate->isSameDay($leave->start_date);
+                                                    $isEndDate = $currentDate->isSameDay($leave->end_date);
+                                                    $showAmOnly = $isEndDate && $leave->end_half_day;
+                                                    $showPmOnly = $isStartDate && $leave->start_half_day;
+                                                @endphp
                                                 <!-- Leave Block -->
-                                                <div class="bg-amber-500/20 border border-amber-500/50 rounded-lg p-2 text-xs">
-                                                    <div class="font-medium text-amber-400">{{ $leave->leaveType->name ?? 'Leave' }}</div>
+                                                <div class="rounded-lg text-xs overflow-hidden h-full min-h-[40px] flex" style="border: 1px solid {{ $leaveColor }}80;">
+                                                    @if($showPmOnly)
+                                                        {{-- Start date with half day: only PM (right half) is on leave --}}
+                                                        <div class="w-1/2"></div>
+                                                        <div class="w-1/2 flex items-center justify-center p-1" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium text-xs truncate" style="color: {{ $leaveColor }};">PM</span>
+                                                        </div>
+                                                    @elseif($showAmOnly)
+                                                        {{-- End date with half day: only AM (left half) is on leave --}}
+                                                        <div class="w-1/2 flex items-center justify-center p-1" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium text-xs truncate" style="color: {{ $leaveColor }};">AM</span>
+                                                        </div>
+                                                        <div class="w-1/2"></div>
+                                                    @else
+                                                        {{-- Full day leave --}}
+                                                        <div class="w-full flex items-center justify-center p-2" style="background-color: {{ $leaveColor }}33;">
+                                                            <span class="font-medium truncate" style="color: {{ $leaveColor }};">{{ $leave->leaveType->name ?? 'Leave' }}</span>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             @elseif(count($userShifts) > 0)
                                                 <div class="space-y-1">
                                                     @foreach($userShifts as $shift)
-                                                        @php $shiftEditable = $isShiftEditable($shift); @endphp
+                                                        @php
+                                                            $shiftEditable = $isShiftEditable($shift);
+                                                            $shiftSwappable = $canRequestSwap($shift);
+                                                        @endphp
                                                         <!-- Shift Block -->
-                                                        <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                        <div class="shift-block group/shift relative text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : ($shiftSwappable ? 'cursor-pointer' : 'cursor-default') }} transition-colors hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                              style="background-color: {{ $shift->businessRole?->color ?? $userColor }};"
                                                              data-shift-id="{{ $shift->id }}"
                                                              data-user-id="{{ $user->id }}"
@@ -544,20 +713,43 @@
                                                              data-status="{{ $shift->status->value }}"
                                                              data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                              data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                             data-location-id="{{ $shift->location_id }}"
+                                                             data-department-id="{{ $shift->department_id }}"
+                                                             data-role-id="{{ $shift->business_role_id }}"
                                                              @if($shiftEditable)
                                                              draggable="true"
                                                              @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                              @dragend="handleDragEnd($event)"
-                                                             @click.stop="editModal.open({{ $shift->id }})"
+                                                             @click.stop="selectShift({{ $shift->id }}); editModal.open({{ $shift->id }})"
+                                                             @contextmenu.prevent="showContextMenu($event, 'shift', { shiftId: {{ $shift->id }}, date: '{{ $dateStr }}', userId: {{ $user->id }}, locationId: {{ $shift->location_id }}, departmentId: {{ $shift->department_id }} })"
                                                              @endif>
                                                             @if($shift->isDraft())
                                                                 <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                             @endif
                                                             <div class="shift-times font-medium flex items-center justify-between">
-                                                                <span>{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                                <span class="flex items-center gap-1">
+                                                                    @if($shift->isRecurringParent() || $shift->isRecurringChild())
+                                                                        <svg class="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Recurring shift">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                        </svg>
+                                                                    @endif
+                                                                    {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                                </span>
                                                                 <span class="text-white/60">{{ $shift->duration_hours }} hrs</span>
                                                             </div>
                                                             <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
+                                                            @if($shiftSwappable && !$shiftEditable)
+                                                            <a href="{{ route('shift-swaps.create', $shift) }}"
+                                                               class="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/shift:opacity-100 transition-opacity rounded-lg"
+                                                               title="Request Swap">
+                                                                <span class="flex items-center gap-1 text-white text-[10px] font-medium">
+                                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                                    </svg>
+                                                                    Swap
+                                                                </span>
+                                                            </a>
+                                                            @endif
                                                         </div>
                                                     @endforeach
                                                     @if($cellEditable)
@@ -573,7 +765,8 @@
                                             @elseif($cellEditable)
                                                 <!-- Empty Cell - Add Shift Placeholder -->
                                                 <div class="add-shift-btn h-full min-h-[44px] border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
-                                                     @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})">
+                                                     @click.stop="editModal.create({{ $user->id }}, '{{ $dateStr }}', {{ $userDepartment?->location_id ?? 'null' }}, {{ $userDepartment?->id ?? 'null' }})"
+                                                     @contextmenu.prevent="showContextMenu($event, 'cell', { date: '{{ $dateStr }}', userId: {{ $user->id }}, locationId: {{ $userDepartment?->location_id ?? 'null' }}, departmentId: {{ $userDepartment?->id ?? 'null' }} })">
                                                     <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                     </svg>
@@ -633,8 +826,11 @@
                                         @if(count($userShifts) > 0)
                                             <div class="space-y-1">
                                                 @foreach($userShifts as $shift)
-                                                    @php $shiftEditable = $isShiftEditable($shift); @endphp
-                                                    <div class="shift-block text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : 'cursor-default' }} hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
+                                                    @php
+                                                        $shiftEditable = $isShiftEditable($shift);
+                                                        $shiftSwappable = $canRequestSwap($shift);
+                                                    @endphp
+                                                    <div class="shift-block group/shift relative text-white rounded-lg p-2 text-xs {{ $shiftEditable ? 'cursor-move' : ($shiftSwappable ? 'cursor-pointer' : 'cursor-default') }} hover:brightness-110 {{ $shift->isDraft() ? 'is-draft' : '' }}"
                                                          style="background-color: {{ $shift->businessRole?->color ?? '#4b5563' }};"
                                                          data-shift-id="{{ $shift->id }}"
                                                          data-user-id="{{ $user->id }}"
@@ -642,20 +838,43 @@
                                                          data-status="{{ $shift->status->value }}"
                                                          data-start-time="{{ $shift->start_time->format('H:i') }}"
                                                          data-end-time="{{ $shift->end_time->format('H:i') }}"
+                                                         data-location-id="{{ $shift->location_id }}"
+                                                         data-department-id="{{ $shift->department_id }}"
+                                                         data-role-id="{{ $shift->business_role_id }}"
                                                          @if($shiftEditable)
                                                          draggable="true"
                                                          @dragstart="handleDragStart($event, {{ $shift->id }})"
                                                          @dragend="handleDragEnd($event)"
-                                                         @click.stop="editModal.open({{ $shift->id }})"
+                                                         @click.stop="selectShift({{ $shift->id }}); editModal.open({{ $shift->id }})"
+                                                         @contextmenu.prevent="showContextMenu($event, 'shift', { shiftId: {{ $shift->id }}, date: '{{ $dateStr }}', userId: {{ $user->id }}, locationId: {{ $shift->location_id }}, departmentId: {{ $shift->department_id }} })"
                                                          @endif>
                                                         @if($shift->isDraft())
                                                             <div class="text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5">Draft</div>
                                                         @endif
                                                         <div class="shift-times font-medium flex items-center justify-between">
-                                                            <span>{{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}</span>
+                                                            <span class="flex items-center gap-1">
+                                                                @if($shift->isRecurringParent() || $shift->isRecurringChild())
+                                                                    <svg class="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Recurring shift">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                    </svg>
+                                                                @endif
+                                                                {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                            </span>
                                                             <span class="text-white/60">{{ $shift->duration_hours }} hrs</span>
                                                         </div>
                                                         <div class="shift-role truncate" style="color: rgba(255,255,255,0.85);">{{ $shift->businessRole?->name ?? 'No role' }}</div>
+                                                        @if($shiftSwappable && !$shiftEditable)
+                                                        <a href="{{ route('shift-swaps.create', $shift) }}"
+                                                           class="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/shift:opacity-100 transition-opacity rounded-lg"
+                                                           title="Request Swap">
+                                                            <span class="flex items-center gap-1 text-white text-[10px] font-medium">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                                </svg>
+                                                                Swap
+                                                            </span>
+                                                        </a>
+                                                        @endif
                                                     </div>
                                                 @endforeach
                                                 @if($cellEditable)
@@ -725,6 +944,26 @@
             :businessRoles="$businessRoles"
             :users="$users"
         />
+
+        <!-- Context Menu -->
+        <x-shift-context-menu />
+
+        <!-- Clipboard Indicator -->
+        <div x-show="clipboard.data.length > 0"
+             x-cloak
+             class="fixed bottom-4 right-4 z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
+            <div class="flex items-center gap-2 text-sm text-gray-300">
+                <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span x-text="clipboard.data.length + ' shift' + (clipboard.data.length > 1 ? 's' : '') + ' copied'">1 shift copied</span>
+            </div>
+            <button @click="clearClipboard()" class="p-1 text-gray-500 hover:text-white transition-colors" title="Clear clipboard">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
 
         <!-- Notification Modal -->
         <div x-show="notification.isOpen"
@@ -949,6 +1188,31 @@
                     onCancel: null
                 },
 
+                // Clipboard state for copy/paste
+                clipboard: {
+                    type: null,        // 'shift' | 'day' | 'week'
+                    data: [],          // Array of shift data objects
+                    sourceDate: null,
+                    sourceUserId: null,
+                    copiedAt: null
+                },
+
+                // Selected shift for keyboard shortcuts
+                selectedShiftId: null,
+
+                // Context menu state
+                contextMenu: {
+                    isOpen: false,
+                    x: 0,
+                    y: 0,
+                    type: 'shift',  // 'shift' | 'cell' | 'day'
+                    targetId: null,
+                    targetDate: null,
+                    targetUserId: null,
+                    targetLocationId: null,
+                    targetDepartmentId: null
+                },
+
                 showNotification(type, title, message) {
                     this.notification.type = type;
                     this.notification.title = title;
@@ -992,6 +1256,277 @@
                     this.confirmModal.isOpen = false;
                     this.confirmModal.onConfirm = null;
                     this.confirmModal.onCancel = null;
+                },
+
+                // ========================================
+                // Copy/Paste Methods
+                // ========================================
+
+                copyShift(shiftId) {
+                    const shiftBlock = document.querySelector(`[data-shift-id="${shiftId}"]`);
+                    if (!shiftBlock) return;
+
+                    const shiftData = {
+                        start_time: shiftBlock.dataset.startTime,
+                        end_time: shiftBlock.dataset.endTime,
+                        location_id: parseInt(shiftBlock.dataset.locationId),
+                        department_id: parseInt(shiftBlock.dataset.departmentId),
+                        business_role_id: parseInt(shiftBlock.dataset.roleId),
+                        break_duration_minutes: 0,
+                        notes: null
+                    };
+
+                    this.clipboard = {
+                        type: 'shift',
+                        data: [shiftData],
+                        sourceDate: shiftBlock.dataset.date,
+                        sourceUserId: shiftBlock.dataset.userId || null,
+                        copiedAt: new Date().toISOString()
+                    };
+
+                    // Store in sessionStorage for cross-navigation persistence
+                    sessionStorage.setItem('shiftClipboard', JSON.stringify(this.clipboard));
+
+                    this.showSuccess('Shift copied to clipboard', 'Copied');
+                },
+
+                copyDay(date, userId = null) {
+                    // Find all shifts for this date (optionally filtered by user)
+                    let selector = `.shift-block[data-date="${date}"]`;
+                    if (userId) {
+                        selector = `.shift-block[data-date="${date}"][data-user-id="${userId}"]`;
+                    }
+
+                    const shiftBlocks = document.querySelectorAll(selector);
+                    if (shiftBlocks.length === 0) {
+                        this.showError('No shifts found to copy', 'Copy Failed');
+                        return;
+                    }
+
+                    const shiftsData = Array.from(shiftBlocks).map(block => ({
+                        start_time: block.dataset.startTime,
+                        end_time: block.dataset.endTime,
+                        location_id: parseInt(block.dataset.locationId),
+                        department_id: parseInt(block.dataset.departmentId),
+                        business_role_id: parseInt(block.dataset.roleId),
+                        break_duration_minutes: 0,
+                        notes: null
+                    }));
+
+                    this.clipboard = {
+                        type: 'day',
+                        data: shiftsData,
+                        sourceDate: date,
+                        sourceUserId: userId,
+                        copiedAt: new Date().toISOString()
+                    };
+
+                    sessionStorage.setItem('shiftClipboard', JSON.stringify(this.clipboard));
+
+                    this.showSuccess(`${shiftsData.length} shift(s) copied to clipboard`, 'Copied');
+                },
+
+                async paste(targetUserId, targetDate) {
+                    if (this.clipboard.data.length === 0) {
+                        this.showError('Nothing to paste', 'Paste Failed');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('{{ route("shifts.paste") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                shifts: this.clipboard.data,
+                                target_date: targetDate,
+                                target_user_id: targetUserId || null
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            let errorMessage = data.message || 'Failed to paste shifts';
+                            if (data.errors && typeof data.errors === 'object') {
+                                const firstError = Object.values(data.errors)[0];
+                                errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+                            }
+                            this.showError(errorMessage, 'Paste Failed');
+                            return;
+                        }
+
+                        this.showSuccess(data.message, 'Pasted');
+
+                        // Update draft count for newly created shifts
+                        if (data.created_count > 0) {
+                            window.dispatchEvent(new CustomEvent('draft-count-change', { detail: { delta: data.created_count } }));
+                        }
+
+                        // Reload to show new shifts
+                        setTimeout(() => window.location.reload(), 500);
+                    } catch (error) {
+                        console.error('Paste failed:', error);
+                        this.showError('Failed to paste shifts. Please try again.', 'Paste Failed');
+                    }
+                },
+
+                pasteDay(targetDate) {
+                    // Paste all shifts from clipboard to target date (keeping original user assignments null for unassigned)
+                    this.paste(null, targetDate);
+                },
+
+                clearClipboard() {
+                    this.clipboard = {
+                        type: null,
+                        data: [],
+                        sourceDate: null,
+                        sourceUserId: null,
+                        copiedAt: null
+                    };
+                    sessionStorage.removeItem('shiftClipboard');
+                },
+
+                loadClipboardFromStorage() {
+                    const stored = sessionStorage.getItem('shiftClipboard');
+                    if (stored) {
+                        try {
+                            this.clipboard = JSON.parse(stored);
+                        } catch (e) {
+                            console.error('Failed to load clipboard from storage:', e);
+                        }
+                    }
+                },
+
+                // Context menu handlers
+                showContextMenu(event, type, options = {}) {
+                    event.preventDefault();
+
+                    this.contextMenu.isOpen = true;
+                    this.contextMenu.x = event.clientX;
+                    this.contextMenu.y = event.clientY;
+                    this.contextMenu.type = type;
+                    this.contextMenu.targetId = options.shiftId || null;
+                    this.contextMenu.targetDate = options.date || null;
+                    this.contextMenu.targetUserId = options.userId || null;
+                    this.contextMenu.targetLocationId = options.locationId || null;
+                    this.contextMenu.targetDepartmentId = options.departmentId || null;
+
+                    // Adjust position if menu would go off screen
+                    this.$nextTick(() => {
+                        const menu = this.$el.querySelector('[x-show="contextMenu.isOpen"]');
+                        if (menu) {
+                            const rect = menu.getBoundingClientRect();
+                            if (rect.right > window.innerWidth) {
+                                this.contextMenu.x = window.innerWidth - rect.width - 10;
+                            }
+                            if (rect.bottom > window.innerHeight) {
+                                this.contextMenu.y = window.innerHeight - rect.height - 10;
+                            }
+                        }
+                    });
+                },
+
+                createShiftFromContext() {
+                    this.editModal.create(
+                        this.contextMenu.targetUserId,
+                        this.contextMenu.targetDate,
+                        this.contextMenu.targetLocationId,
+                        this.contextMenu.targetDepartmentId
+                    );
+                },
+
+                async confirmDeleteShift(shiftId) {
+                    this.showConfirm(
+                        'Delete Shift',
+                        'Are you sure you want to delete this shift?',
+                        async () => {
+                            try {
+                                const response = await fetch(`/shifts/${shiftId}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                    }
+                                });
+
+                                if (response.ok) {
+                                    // Remove from DOM
+                                    const shiftBlock = document.querySelector(`[data-shift-id="${shiftId}"]`);
+                                    if (shiftBlock) {
+                                        const wasDraft = shiftBlock.dataset.status === 'draft';
+                                        shiftBlock.remove();
+                                        if (wasDraft) {
+                                            window.dispatchEvent(new CustomEvent('draft-count-change', { detail: { delta: -1 } }));
+                                        }
+                                    }
+                                    this.showSuccess('Shift deleted successfully', 'Deleted');
+                                } else {
+                                    this.showError('Failed to delete shift', 'Error');
+                                }
+                            } catch (error) {
+                                console.error('Delete failed:', error);
+                                this.showError('Failed to delete shift', 'Error');
+                            }
+                        }
+                    );
+                },
+
+                // Keyboard shortcut handler
+                handleKeydown(event) {
+                    // Ignore if typing in an input
+                    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                        return;
+                    }
+
+                    // Escape - close context menu, clear selection
+                    if (event.key === 'Escape') {
+                        this.contextMenu.isOpen = false;
+                        this.selectedShiftId = null;
+                        return;
+                    }
+
+                    // Ctrl+C - copy selected shift
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'c' && this.selectedShiftId) {
+                        event.preventDefault();
+                        this.copyShift(this.selectedShiftId);
+                        return;
+                    }
+
+                    // Ctrl+V - paste if clipboard has content and we have a target
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'v' && this.clipboard.data.length > 0) {
+                        event.preventDefault();
+                        // Find hovered cell
+                        const hoveredCell = document.querySelector('.schedule-cell:hover');
+                        if (hoveredCell) {
+                            const targetUserId = hoveredCell.dataset.userId || null;
+                            const targetDate = hoveredCell.dataset.date;
+                            if (targetDate) {
+                                this.paste(targetUserId, targetDate);
+                            }
+                        } else {
+                            this.showError('Hover over a cell to paste', 'Paste');
+                        }
+                        return;
+                    }
+                },
+
+                selectShift(shiftId) {
+                    this.selectedShiftId = shiftId;
+
+                    // Clear previous selection styling
+                    document.querySelectorAll('.shift-block.selected').forEach(el => {
+                        el.classList.remove('selected', 'ring-2', 'ring-brand-500');
+                    });
+
+                    // Add selection styling
+                    const shiftBlock = document.querySelector(`[data-shift-id="${shiftId}"]`);
+                    if (shiftBlock) {
+                        shiftBlock.classList.add('selected', 'ring-2', 'ring-brand-500');
+                    }
                 },
 
                 // Check if a shift is editable by current user
@@ -1141,6 +1676,26 @@
                     }
                 },
 
+                // Toggle day of week for weekly recurrence
+                toggleDayOfWeek(dayIndex) {
+                    if (!this.editModal.shift.recurrence_rule.days_of_week) {
+                        this.editModal.shift.recurrence_rule.days_of_week = [];
+                    }
+
+                    const days = this.editModal.shift.recurrence_rule.days_of_week;
+                    const index = days.indexOf(dayIndex);
+
+                    if (index === -1) {
+                        days.push(dayIndex);
+                        days.sort((a, b) => a - b);
+                    } else {
+                        // Don't allow deselecting if it's the only day
+                        if (days.length > 1) {
+                            days.splice(index, 1);
+                        }
+                    }
+                },
+
                 editModal: {
                     isOpen: false,
                     isCreateMode: false,
@@ -1154,6 +1709,9 @@
                     shiftId: null,
                     originalUserId: null,
                     originalDate: null,
+                    recurrenceEndType: 'never',
+                    editScope: 'single',
+                    deleteScope: 'single',
                     shift: {
                         id: null,
                         location_id: null,
@@ -1165,7 +1723,16 @@
                         end_time: '',
                         break_duration_minutes: 0,
                         notes: '',
-                        status: 'draft'
+                        status: 'draft',
+                        is_recurring: false,
+                        parent_shift_id: null,
+                        recurrence_rule: {
+                            frequency: 'weekly',
+                            interval: 1,
+                            days_of_week: [],
+                            end_date: null,
+                            end_after_occurrences: null
+                        }
                     },
 
                     // Create new shift - called when clicking empty cell
@@ -1179,6 +1746,9 @@
                         this.shiftId = null;
                         this.originalUserId = null;
                         this.originalDate = null;
+                        this.recurrenceEndType = 'never';
+                        this.editScope = 'single';
+                        this.deleteScope = 'single';
 
                         let roleId = null;
 
@@ -1199,6 +1769,10 @@
                             }
                         }
 
+                        // Get day of week for initial recurrence setting
+                        const dateObj = new Date(date + 'T00:00:00');
+                        const dayOfWeek = dateObj.getDay();
+
                         this.shift = {
                             id: null,
                             location_id: locationId,
@@ -1210,7 +1784,16 @@
                             end_time: '17:00',
                             break_duration_minutes: 30,
                             notes: '',
-                            status: 'draft'
+                            status: 'draft',
+                            is_recurring: false,
+                            parent_shift_id: null,
+                            recurrence_rule: {
+                                frequency: 'weekly',
+                                interval: 1,
+                                days_of_week: [dayOfWeek],
+                                end_date: null,
+                                end_after_occurrences: null
+                            }
                         };
                     },
 
@@ -1222,6 +1805,8 @@
                         this.error = null;
                         this.errors = {};
                         this.confirmDelete = false;
+                        this.editScope = 'single';
+                        this.deleteScope = 'single';
 
                         try {
                             const response = await fetch(`/shifts/${shiftId}`, {
@@ -1247,6 +1832,24 @@
                             this.originalStartTime = shift.start_time.substring(0, 5);
                             this.originalEndTime = shift.end_time.substring(0, 5);
 
+                            // Parse recurrence rule
+                            const recurrenceRule = shift.recurrence_rule || {
+                                frequency: 'weekly',
+                                interval: 1,
+                                days_of_week: [],
+                                end_date: null,
+                                end_after_occurrences: null
+                            };
+
+                            // Set recurrence end type based on rule
+                            if (recurrenceRule.end_date) {
+                                this.recurrenceEndType = 'date';
+                            } else if (recurrenceRule.end_after_occurrences) {
+                                this.recurrenceEndType = 'occurrences';
+                            } else {
+                                this.recurrenceEndType = 'never';
+                            }
+
                             this.shift = {
                                 id: shift.id,
                                 location_id: shift.location_id,
@@ -1258,7 +1861,10 @@
                                 end_time: shift.end_time.substring(0, 5),
                                 break_duration_minutes: shift.break_duration_minutes || 0,
                                 notes: shift.notes || '',
-                                status: shift.status
+                                status: shift.status,
+                                is_recurring: shift.is_recurring || false,
+                                parent_shift_id: shift.parent_shift_id || null,
+                                recurrence_rule: recurrenceRule
                             };
                         } catch (error) {
                             this.error = error.message || 'Failed to load shift';
@@ -1285,6 +1891,45 @@
                         const url = isCreate ? '/shifts' : `/shifts/${this.shiftId}`;
                         const method = isCreate ? 'POST' : 'PUT';
 
+                        // Build recurrence rule based on end type
+                        let recurrenceRule = null;
+                        if (this.shift.is_recurring) {
+                            recurrenceRule = {
+                                frequency: this.shift.recurrence_rule.frequency,
+                                interval: parseInt(this.shift.recurrence_rule.interval) || 1,
+                                days_of_week: this.shift.recurrence_rule.days_of_week || []
+                            };
+
+                            // Set end condition based on selected type
+                            if (this.recurrenceEndType === 'date' && this.shift.recurrence_rule.end_date) {
+                                recurrenceRule.end_date = this.shift.recurrence_rule.end_date;
+                            } else if (this.recurrenceEndType === 'occurrences' && this.shift.recurrence_rule.end_after_occurrences) {
+                                recurrenceRule.end_after_occurrences = parseInt(this.shift.recurrence_rule.end_after_occurrences);
+                            }
+                        }
+
+                        // Build request body
+                        const requestBody = {
+                            location_id: this.shift.location_id,
+                            department_id: this.shift.department_id,
+                            business_role_id: this.shift.business_role_id,
+                            user_id: this.shift.user_id,
+                            date: this.shift.date,
+                            start_time: this.shift.start_time,
+                            end_time: this.shift.end_time,
+                            break_duration_minutes: this.shift.break_duration_minutes,
+                            notes: this.shift.notes,
+                            status: this.shift.status
+                        };
+
+                        // Add recurrence data for create, or edit_scope for recurring updates
+                        if (isCreate) {
+                            requestBody.is_recurring = this.shift.is_recurring;
+                            requestBody.recurrence_rule = recurrenceRule;
+                        } else if (this.shift.is_recurring || this.shift.parent_shift_id) {
+                            requestBody.edit_scope = this.editScope;
+                        }
+
                         try {
                             const response = await fetch(url, {
                                 method: method,
@@ -1293,18 +1938,7 @@
                                     'Accept': 'application/json',
                                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                                 },
-                                body: JSON.stringify({
-                                    location_id: this.shift.location_id,
-                                    department_id: this.shift.department_id,
-                                    business_role_id: this.shift.business_role_id,
-                                    user_id: this.shift.user_id,
-                                    date: this.shift.date,
-                                    start_time: this.shift.start_time,
-                                    end_time: this.shift.end_time,
-                                    break_duration_minutes: this.shift.break_duration_minutes,
-                                    notes: this.shift.notes,
-                                    status: this.shift.status
-                                })
+                                body: JSON.stringify(requestBody)
                             });
 
                             const data = await response.json();
@@ -1372,8 +2006,14 @@
                         const wasUnassigned = !this.shift.user_id;
                         const shiftHours = calculateShiftHours(this.shift.start_time, this.shift.end_time);
 
+                        // Build URL with delete_scope for recurring shifts
+                        let deleteUrl = `/shifts/${this.shiftId}`;
+                        if (this.shift.is_recurring || this.shift.parent_shift_id) {
+                            deleteUrl += `?delete_scope=${this.deleteScope}`;
+                        }
+
                         try {
-                            const response = await fetch(`/shifts/${this.shiftId}`, {
+                            const response = await fetch(deleteUrl, {
                                 method: 'DELETE',
                                 headers: {
                                     'Accept': 'application/json',
@@ -1765,6 +2405,12 @@
 
                 init() {
                     this.initFilters();
+
+                    // Load clipboard from session storage
+                    this.loadClipboardFromStorage();
+
+                    // Set up keyboard shortcuts
+                    document.addEventListener('keydown', (e) => this.handleKeydown(e));
                 },
 
                 // Drag and Drop handlers
@@ -1948,11 +2594,23 @@
                         // Update unassigned count in header
                         this.updateUnassignedCount();
 
-                        // Show warning if shift was published
+                        // If shift was published, the server reverted it to draft
                         if (shiftStatus === 'published') {
+                            this.draftCount++;
+                            originalElement.classList.add('is-draft');
+                            originalElement.dataset.status = 'draft';
+
+                            // Add draft label if not already present
+                            if (!originalElement.querySelector('.draft-label')) {
+                                const draftLabel = document.createElement('div');
+                                draftLabel.className = 'draft-label text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-0.5';
+                                draftLabel.textContent = 'Draft';
+                                originalElement.insertBefore(draftLabel, originalElement.firstChild);
+                            }
+
                             this.showConfirm(
                                 'Shift Moved',
-                                'This shift is already published. If you move it you will need to publish it again.',
+                                'This shift has been reverted to draft. You will need to publish it again.',
                                 () => {},
                                 null
                             );

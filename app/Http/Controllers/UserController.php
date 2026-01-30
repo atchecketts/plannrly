@@ -11,22 +11,83 @@ use App\Models\Location;
 use App\Models\User;
 use App\Models\UserBusinessRole;
 use App\Models\UserRoleAssignment;
+use App\Traits\HandlesSorting;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class UserController extends Controller
 {
-    public function index(): View
+    use HandlesSorting;
+
+    private const SORTABLE_COLUMNS = [
+        'name' => 'first_name',
+        'email' => 'email',
+        'status' => 'is_active',
+    ];
+
+    private const GROUPABLE_COLUMNS = ['name', 'email', 'status'];
+
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::with(['roleAssignments', 'businessRoles'])
-            ->where('tenant_id', auth()->user()->tenant_id)
-            ->orderBy('first_name')
-            ->paginate(15);
+        $query = User::with(['roleAssignments', 'businessRoles'])
+            ->where('tenant_id', auth()->user()->tenant_id);
 
-        return view('users.index', compact('users'));
+        $sortParams = $this->getSortParameters($request, self::SORTABLE_COLUMNS, self::GROUPABLE_COLUMNS);
+
+        $allGroups = $this->getUserGroups($query, $sortParams['group']);
+
+        $this->applySorting($query, $request, self::SORTABLE_COLUMNS, 'name', 'asc', self::GROUPABLE_COLUMNS);
+
+        // When grouping, fetch all records; otherwise paginate
+        if ($sortParams['group']) {
+            $users = $query->get();
+        } else {
+            $users = $query->paginate(15)->withQueryString();
+        }
+
+        return view('users.index', compact('users', 'sortParams', 'allGroups'));
+    }
+
+    /**
+     * Get all unique group values for users.
+     */
+    private function getUserGroups($query, ?string $group): array
+    {
+        if (! $group) {
+            return [];
+        }
+
+        return match ($group) {
+            'name' => $this->getAllGroupValues(
+                $query,
+                'first_name',
+                fn ($name) => [
+                    'key' => 'name-'.strtoupper(substr($name, 0, 1)),
+                    'label' => strtoupper(substr($name, 0, 1)),
+                ]
+            )->unique('key')->values()->toArray(),
+            'email' => $this->getAllGroupValues(
+                $query,
+                'email',
+                fn ($email) => [
+                    'key' => 'email-'.\Str::slug(substr(strrchr($email, '@'), 1)),
+                    'label' => '@'.substr(strrchr($email, '@'), 1),
+                ]
+            )->unique('key')->values()->toArray(),
+            'status' => $this->getAllGroupValues(
+                $query,
+                'is_active',
+                fn ($isActive) => [
+                    'key' => 'status-'.($isActive ? 'active' : 'inactive'),
+                    'label' => $isActive ? 'Active' : 'Inactive',
+                ]
+            )->toArray(),
+            default => [],
+        };
     }
 
     public function create(): View

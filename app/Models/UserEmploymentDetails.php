@@ -75,7 +75,7 @@ class UserEmploymentDetails extends Model
         }
 
         return $this->final_working_date->isFuture()
-            && $this->final_working_date->diffInDays(now()) <= $withinDays;
+            && now()->diffInDays($this->final_working_date, absolute: true) <= $withinDays;
     }
 
     /**

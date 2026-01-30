@@ -704,8 +704,8 @@ class DemoDataSeeder extends Seeder
 
         if ($status === EmploymentStatus::OnLeave) {
             $data['notes'] = $this->faker->randomElement([
-                'On parental leave until ' . now()->addWeeks(rand(4, 12))->format('d M Y'),
-                'Medical leave - expected return ' . now()->addWeeks(rand(2, 6))->format('d M Y'),
+                'On parental leave until '.now()->addWeeks(rand(4, 12))->format('d M Y'),
+                'Medical leave - expected return '.now()->addWeeks(rand(2, 6))->format('d M Y'),
                 'Sabbatical leave',
             ]);
         }

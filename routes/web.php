@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttendanceReportController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\AvailabilityController;
@@ -12,15 +13,21 @@ use App\Http\Controllers\LeaveAllowanceController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\ShiftCopyController;
 use App\Http\Controllers\ShiftSwapController;
+use App\Http\Controllers\StaffingRequirementController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SuperAdmin\ImpersonationController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\UserController as SuperAdminUserController;
 use App\Http\Controllers\TenantSettingsController;
+use App\Http\Controllers\TimeEntryController;
+use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserFilterController;
 use Illuminate\Support\Facades\Route;
@@ -64,6 +71,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
     Route::delete('profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
 
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/unread', [NotificationController::class, 'unread'])->name('notifications.unread');
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::delete('notifications', [NotificationController::class, 'clearAll'])->name('notifications.clear-all');
+    Route::get('notifications/preferences', [NotificationPreferenceController::class, 'index'])->name('notifications.preferences');
+    Route::put('notifications/preferences', [NotificationPreferenceController::class, 'update'])->name('notifications.preferences.update');
+
     // Availability (Self-Service)
     Route::get('availability', [AvailabilityController::class, 'index'])->name('availability.index');
     Route::get('availability/edit', [AvailabilityController::class, 'edit'])->name('availability.edit');
@@ -84,9 +101,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('shifts/{shift}/assign', [ShiftController::class, 'assign'])->name('shifts.assign');
     Route::post('shifts/{shift}/publish', [ShiftController::class, 'publish'])->name('shifts.publish');
     Route::get('shifts/{shift}/available-users', [ShiftController::class, 'availableUsers'])->name('shifts.available-users');
+    Route::post('shifts/paste', [ShiftCopyController::class, 'paste'])->name('shifts.paste');
 
     Route::resource('leave-types', LeaveTypeController::class)->except(['show']);
     Route::resource('leave-allowances', LeaveAllowanceController::class)->except(['show']);
+    Route::resource('staffing-requirements', StaffingRequirementController::class)->except(['show']);
     Route::resource('leave-requests', LeaveRequestController::class)->except(['edit', 'update']);
     Route::post('leave-requests/{leaveRequest}/submit', [LeaveRequestController::class, 'submit'])->name('leave-requests.submit');
     Route::post('leave-requests/{leaveRequest}/review', [LeaveRequestController::class, 'review'])->name('leave-requests.review');
@@ -112,6 +131,34 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     // Feature API
     Route::get('api/features', [FeatureController::class, 'status'])->name('api.features.status');
     Route::get('api/features/{feature}', [FeatureController::class, 'check'])->name('api.features.check');
+
+    // Time Entries (Clock In/Out)
+    Route::get('time-entries', [TimeEntryController::class, 'index'])->name('time-entries.index');
+    Route::get('time-entries/status', [TimeEntryController::class, 'currentStatus'])->name('time-entries.status');
+    Route::get('time-entries/{timeEntry}', [TimeEntryController::class, 'show'])->name('time-entries.show');
+    Route::post('time-entries/clock-in', [TimeEntryController::class, 'clockIn'])->name('time-entries.clock-in');
+    Route::post('time-entries/{timeEntry}/clock-out', [TimeEntryController::class, 'clockOut'])->name('time-entries.clock-out');
+    Route::post('time-entries/{timeEntry}/start-break', [TimeEntryController::class, 'startBreak'])->name('time-entries.start-break');
+    Route::post('time-entries/{timeEntry}/end-break', [TimeEntryController::class, 'endBreak'])->name('time-entries.end-break');
+    Route::put('time-entries/{timeEntry}/adjust', [TimeEntryController::class, 'adjust'])->name('time-entries.adjust');
+    Route::post('time-entries/{timeEntry}/approve', [TimeEntryController::class, 'approve'])->name('time-entries.approve');
+
+    // Timesheets
+    Route::get('timesheets', [TimesheetController::class, 'index'])->name('timesheets.index');
+    Route::get('timesheets/my', [TimesheetController::class, 'employee'])->name('timesheets.employee');
+    Route::post('timesheets/approve-multiple', [TimesheetController::class, 'approveMultiple'])->name('timesheets.approve-multiple');
+    Route::get('timesheets/export', [TimesheetController::class, 'export'])->name('timesheets.export');
+    Route::get('timesheets/export/payroll', [TimesheetController::class, 'exportPayroll'])->name('timesheets.export.payroll');
+
+    // Attendance Reports
+    Route::get('reports/attendance', [AttendanceReportController::class, 'index'])->name('reports.attendance.index');
+    Route::get('reports/attendance/punctuality', [AttendanceReportController::class, 'punctuality'])->name('reports.attendance.punctuality');
+    Route::get('reports/attendance/hours', [AttendanceReportController::class, 'hours'])->name('reports.attendance.hours');
+    Route::get('reports/attendance/overtime', [AttendanceReportController::class, 'overtime'])->name('reports.attendance.overtime');
+    Route::get('reports/attendance/absence', [AttendanceReportController::class, 'absence'])->name('reports.attendance.absence');
+    Route::get('reports/attendance/employee/{user}', [AttendanceReportController::class, 'employee'])->name('reports.attendance.employee');
+    Route::get('reports/attendance/department/{department}', [AttendanceReportController::class, 'department'])->name('reports.attendance.department');
+    Route::get('reports/attendance/export/{type}', [AttendanceReportController::class, 'export'])->name('reports.attendance.export');
 });
 
 // Super Admin Routes

@@ -21,7 +21,10 @@
 
             <x-form.textarea name="description" label="Description (optional)" :value="$businessRole->description" />
 
-            <x-form.input name="default_hourly_rate" type="number" label="Default Hourly Rate (optional)" :value="$businessRole->default_hourly_rate" step="0.01" />
+            <div>
+                <x-form.input name="default_hourly_rate" type="number" label="Default Hourly Rate" :value="$businessRole->default_hourly_rate" step="0.01" />
+                <p class="mt-1 text-xs text-gray-500">Used when no employee-specific rate is set</p>
+            </div>
 
             <x-form.color name="color" label="Color" :value="$businessRole->color" />
 

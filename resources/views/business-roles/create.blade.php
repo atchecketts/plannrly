@@ -20,7 +20,10 @@
 
             <x-form.textarea name="description" label="Description (optional)" />
 
-            <x-form.input name="default_hourly_rate" type="number" label="Default Hourly Rate (optional)" step="0.01" />
+            <div>
+                <x-form.input name="default_hourly_rate" type="number" label="Default Hourly Rate" step="0.01" />
+                <p class="mt-1 text-xs text-gray-500">Used when no employee-specific rate is set</p>
+            </div>
 
             <x-form.color name="color" label="Color" value="#6B7280" />
 

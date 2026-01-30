@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\ShiftStatus;
 use App\Traits\BelongsToTenant;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +36,8 @@ class Shift extends Model
         'recurrence_rule',
         'parent_shift_id',
         'created_by',
+        'reminder_sent_at',
+        'hour_reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -44,6 +49,8 @@ class Shift extends Model
             'status' => ShiftStatus::class,
             'is_recurring' => 'boolean',
             'recurrence_rule' => 'array',
+            'reminder_sent_at' => 'datetime',
+            'hour_reminder_sent_at' => 'datetime',
         ];
     }
 
@@ -207,5 +214,107 @@ class Shift extends Model
     public function canBePublished(): bool
     {
         return $this->isDraft();
+    }
+
+    /**
+     * Check if this shift is a recurring parent (template).
+     */
+    public function isRecurringParent(): bool
+    {
+        return $this->is_recurring && $this->parent_shift_id === null;
+    }
+
+    /**
+     * Check if this shift is a child of a recurring parent.
+     */
+    public function isRecurringChild(): bool
+    {
+        return $this->parent_shift_id !== null;
+    }
+
+    /**
+     * Check if this shift has child instances.
+     */
+    public function hasChildren(): bool
+    {
+        return $this->childShifts()->exists();
+    }
+
+    /**
+     * Get future child shifts (from today onwards).
+     *
+     * @return Collection<int, Shift>
+     */
+    public function getFutureChildren(): Collection
+    {
+        return $this->childShifts()
+            ->where('date', '>=', Carbon::today())
+            ->orderBy('date')
+            ->get();
+    }
+
+    /**
+     * Scope to get only recurring parent shifts.
+     *
+     * @param  Builder<Shift>  $query
+     * @return Builder<Shift>
+     */
+    public function scopeRecurringParents(Builder $query): Builder
+    {
+        return $query->where('is_recurring', true)
+            ->whereNull('parent_shift_id');
+    }
+
+    /**
+     * Scope to get only recurring child shifts.
+     *
+     * @param  Builder<Shift>  $query
+     * @return Builder<Shift>
+     */
+    public function scopeRecurringChildren(Builder $query): Builder
+    {
+        return $query->whereNotNull('parent_shift_id');
+    }
+
+    /**
+     * Get the recurrence frequency label.
+     */
+    public function getRecurrenceFrequencyLabelAttribute(): ?string
+    {
+        if (! $this->is_recurring || empty($this->recurrence_rule)) {
+            return null;
+        }
+
+        $rule = $this->recurrence_rule;
+        $frequency = $rule['frequency'] ?? null;
+        $interval = $rule['interval'] ?? 1;
+
+        return match ($frequency) {
+            'daily' => $interval === 1 ? 'Daily' : "Every {$interval} days",
+            'weekly' => $this->formatWeeklyLabel($rule, $interval),
+            'monthly' => $interval === 1 ? 'Monthly' : "Every {$interval} months",
+            default => null,
+        };
+    }
+
+    /**
+     * Format the weekly recurrence label.
+     *
+     * @param  array<string, mixed>  $rule
+     */
+    protected function formatWeeklyLabel(array $rule, int $interval): string
+    {
+        $daysOfWeek = $rule['days_of_week'] ?? [];
+
+        if (empty($daysOfWeek)) {
+            return $interval === 1 ? 'Weekly' : "Every {$interval} weeks";
+        }
+
+        $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        $selectedDays = array_map(fn ($day) => $dayNames[$day], $daysOfWeek);
+
+        $daysStr = implode(', ', $selectedDays);
+
+        return $interval === 1 ? "Weekly on {$daysStr}" : "Every {$interval} weeks on {$daysStr}";
     }
 }

@@ -152,7 +152,7 @@ class AvailabilityService
     {
         $query = UserAvailability::where('user_id', $user->id)
             ->where('type', AvailabilityType::SpecificDate)
-            ->where('specific_date', $date->toDateString())
+            ->whereDate('specific_date', $date)
             ->effective($date);
 
         $rules = $query->get();

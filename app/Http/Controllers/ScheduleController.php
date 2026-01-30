@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Models\Shift;
 use App\Models\User;
 use App\Notifications\ShiftPublishedNotification;
+use App\Services\CoverageAnalysisService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,10 @@ use Illuminate\View\View;
 
 class ScheduleController extends Controller
 {
+    public function __construct(
+        private CoverageAnalysisService $coverageService
+    ) {}
+
     public function index(Request $request): View
     {
         // Determine the week to display (default to current week)
@@ -76,9 +81,10 @@ class ScheduleController extends Controller
 
         // Get all active users with their roles and leave requests (only users with business roles)
         $users = User::with(['businessRoles.department', 'leaveRequests' => function ($query) use ($startDate, $endDate) {
-            $query->where('status', 'approved')
-                ->where('start_date', '<=', $endDate)
-                ->where('end_date', '>=', $startDate);
+            $query->with('leaveType')
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $endDate)
+                ->whereDate('end_date', '>=', $startDate);
         }])
             ->whereHas('businessRoles')
             ->active()
@@ -156,6 +162,14 @@ class ScheduleController extends Controller
         $editableLocationIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedLocationIds();
         $editableDepartmentIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedDepartmentIds();
 
+        // Coverage analysis (only for admins)
+        $coverageSummary = null;
+        $coverageIssues = collect();
+        if (! $user->isEmployee()) {
+            $coverageSummary = $this->coverageService->getCoverageSummary($startDate, $endDate);
+            $coverageIssues = $this->coverageService->getCoverageIssues($startDate, $endDate);
+        }
+
         return view('schedule.index', compact(
             'startDate',
             'endDate',
@@ -179,7 +193,9 @@ class ScheduleController extends Controller
             'groupBy',
             'canEditShifts',
             'editableLocationIds',
-            'editableDepartmentIds'
+            'editableDepartmentIds',
+            'coverageSummary',
+            'coverageIssues'
         ));
     }
 
@@ -244,9 +260,10 @@ class ScheduleController extends Controller
 
         // Get all active users with their roles and leave requests
         $users = User::with(['businessRoles.department', 'leaveRequests' => function ($query) use ($selectedDate) {
-            $query->where('status', 'approved')
-                ->where('start_date', '<=', $selectedDate)
-                ->where('end_date', '>=', $selectedDate);
+            $query->with('leaveType')
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $selectedDate)
+                ->whereDate('end_date', '>=', $selectedDate);
         }])
             ->whereHas('businessRoles')
             ->active()
@@ -310,6 +327,12 @@ class ScheduleController extends Controller
         $editableLocationIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedLocationIds();
         $editableDepartmentIds = $user->isSuperAdmin() || $user->isAdmin() ? null : $user->getManagedDepartmentIds();
 
+        // Coverage analysis (only for admins)
+        $dayCoverage = collect();
+        if (! $user->isEmployee()) {
+            $dayCoverage = $this->coverageService->getDayCoverage($selectedDate);
+        }
+
         return view('schedule.day', compact(
             'selectedDate',
             'hours',
@@ -334,7 +357,8 @@ class ScheduleController extends Controller
             'groupBy',
             'canEditShifts',
             'editableLocationIds',
-            'editableDepartmentIds'
+            'editableDepartmentIds',
+            'dayCoverage'
         ));
     }
 
