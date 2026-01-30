@@ -8,11 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('time_entries', function (Blueprint $table) {
-            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('approved_at')->nullable();
-            $table->text('adjustment_reason')->nullable();
-        });
+        if (! Schema::hasColumn('time_entries', 'approved_by')) {
+            Schema::table('time_entries', function (Blueprint $table) {
+                $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            });
+        }
+        if (! Schema::hasColumn('time_entries', 'approved_at')) {
+            Schema::table('time_entries', function (Blueprint $table) {
+                $table->timestamp('approved_at')->nullable();
+            });
+        }
+        if (! Schema::hasColumn('time_entries', 'adjustment_reason')) {
+            Schema::table('time_entries', function (Blueprint $table) {
+                $table->text('adjustment_reason')->nullable();
+            });
+        }
     }
 
     public function down(): void
