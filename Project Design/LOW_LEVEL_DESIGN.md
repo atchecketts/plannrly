@@ -517,6 +517,34 @@
 
 ---
 
+#### schedule_history
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | BIGINT UNSIGNED | PK, AUTO_INCREMENT | Primary key |
+| tenant_id | BIGINT UNSIGNED | FK → tenants.id | Tenant reference |
+| shift_id | BIGINT UNSIGNED | FK → shifts.id, NULLABLE | Related shift (nullable for deleted shifts) |
+| user_id | BIGINT UNSIGNED | FK → users.id | User who made the change |
+| action | VARCHAR(255) | NOT NULL | Action type (created, updated, deleted) |
+| old_values | JSON | NULLABLE | Previous field values |
+| new_values | JSON | NULLABLE | New field values |
+| created_at | TIMESTAMP | NULLABLE | When the change occurred |
+| updated_at | TIMESTAMP | NULLABLE | Last update timestamp |
+
+**Indexes:**
+- PRIMARY KEY (id)
+- INDEX (tenant_id)
+- INDEX (shift_id)
+- INDEX (user_id)
+- INDEX (tenant_id, created_at)
+- INDEX (tenant_id, shift_id)
+
+**Foreign Keys:**
+- tenant_id → tenants(id) ON DELETE CASCADE
+- shift_id → shifts(id) ON DELETE SET NULL
+- user_id → users(id) ON DELETE CASCADE
+
+---
+
 #### time_entries
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|

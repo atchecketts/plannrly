@@ -17,6 +17,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\ScheduleHistoryController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftCopyController;
 use App\Http\Controllers\ShiftSwapController;
@@ -93,6 +94,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('schedule/day', [ScheduleController::class, 'day'])->name('schedule.day');
     Route::get('schedule/draft-count', [ScheduleController::class, 'draftCount'])->name('schedule.draft-count');
     Route::post('schedule/publish', [ScheduleController::class, 'publishAll'])->name('schedule.publish');
+    Route::get('schedule/history', [ScheduleHistoryController::class, 'index'])->name('schedule.history');
+    Route::get('schedule/history/shift/{shift}', [ScheduleHistoryController::class, 'shift'])->name('schedule.history.shift');
 
     Route::post('shifts', [ShiftController::class, 'store'])->name('shifts.store');
     Route::get('shifts/{shift}', [ShiftController::class, 'show'])->name('shifts.show');

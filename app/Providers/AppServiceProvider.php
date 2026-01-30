@@ -13,6 +13,7 @@ use App\Models\Tenant;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserEmploymentDetails;
+use App\Observers\ShiftHistoryObserver;
 use App\Observers\TenantObserver;
 use App\Policies\BusinessRolePolicy;
 use App\Policies\DepartmentPolicy;
@@ -38,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Tenant::observe(TenantObserver::class);
+        Shift::observe(ShiftHistoryObserver::class);
 
         Gate::policy(Tenant::class, TenantPolicy::class);
         Gate::policy(Location::class, LocationPolicy::class);

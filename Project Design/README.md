@@ -25,7 +25,7 @@ This folder contains all design documentation for the Plannrly workforce schedul
 ✅ **Phase 6: Employee Management** - 4/4 complete
 ✅ **Phase 3: Time & Attendance** - 7/8 complete (3.6 Auto Clock-Out deferred)
 ✅ **Phase 4: Notifications System** - 3/3 complete
-🔵 **Phase 2: Enhanced Scheduling Features** - 4/7 complete (2.1 Drag-Drop, 2.2 Copy-Paste, 2.3 Recurring Templates, 2.5 Staffing)
+🔵 **Phase 2: Enhanced Scheduling Features** - 5/7 complete (2.1 Drag-Drop, 2.2 Copy-Paste, 2.3 Recurring Templates, 2.4 Schedule History, 2.5 Staffing)
 
 📊 **Progress is tracked in the tables below**
 
@@ -85,9 +85,10 @@ This folder contains all design documentation for the Plannrly workforce schedul
 - **Attendance Reports (punctuality, hours worked, overtime, absence, CSV export)**
 - **Timesheet Export (detailed CSV, payroll CSV, employee self-service export)**
 - **Notifications System (shift changes, leave status, swap requests, reminders, preferences UI, in-app bell)**
+- **Schedule History / Audit Trail (automatic logging, timeline view, filtering, shift-level history)**
 
 ### Partially Implemented
-- Phase 2: Enhanced Scheduling (2.1 Drag-Drop, 2.2 Copy-Paste, 2.3 Recurring Templates, 2.5 Staffing done, 3 remaining)
+- Phase 2: Enhanced Scheduling (2.1 Drag-Drop, 2.2 Copy-Paste, 2.3 Recurring Templates, 2.4 Schedule History, 2.5 Staffing done, 2 remaining)
 - Phase 3: Time & Attendance (3.1-3.5, 3.7-3.8 done, 3.6 deferred)
 
 ---
@@ -97,7 +98,7 @@ This folder contains all design documentation for the Plannrly workforce schedul
 | Phase | Name | Priority | Status |
 |-------|------|----------|--------|
 | 1 | [Core Missing Features](Implementation%20Plan/Phase-01-Core-Features.md) | High | ✅ Complete |
-| 2 | [Enhanced Scheduling Features](Implementation%20Plan/Phase-02-Scheduling-Features.md) | Medium | 🔵 4/7 |
+| 2 | [Enhanced Scheduling Features](Implementation%20Plan/Phase-02-Scheduling-Features.md) | Medium | 🔵 5/7 |
 | 3 | [Time & Attendance](Implementation%20Plan/Phase-03-Time-Attendance.md) | High | ✅ 7/8 |
 | 4 | [Notifications System](Implementation%20Plan/Phase-04-Notifications.md) | Medium | ✅ Complete |
 | 5 | [Reports & Analytics](Implementation%20Plan/Phase-05-Reports-Analytics.md) | Lower | ⬜ |
@@ -150,7 +151,7 @@ This folder contains all design documentation for the Plannrly workforce schedul
 | [2.1 Drag-and-Drop Shifts](Implementation%20Plan/Features/2.1-Drag-Drop-Shift-Management.md) | ✅ Done |
 | [2.2 Copy and Paste Shifts](Implementation%20Plan/Features/2.2-Copy-Paste-Shifts.md) | ✅ Done |
 | [2.3 Recurring Shift Templates](Implementation%20Plan/Features/2.3-Recurring-Shift-Templates.md) | ✅ Done |
-| [2.4 Schedule History](Implementation%20Plan/Features/2.4-Schedule-History.md) | ⬜ Pending |
+| [2.4 Schedule History](Implementation%20Plan/Features/2.4-Schedule-History.md) | ✅ Done |
 | [2.5 Staffing Requirements](Implementation%20Plan/Features/2.5-Staffing-Requirements.md) | ✅ Done |
 | [2.6 Labor Cost Budgeting](Implementation%20Plan/Features/2.6-Labor-Cost-Budgeting.md) | ⬜ Pending |
 | [2.7 Print Schedule](Implementation%20Plan/Features/2.7-Print-Schedule.md) | ⬜ Pending |
@@ -207,11 +208,10 @@ This folder contains all design documentation for the Plannrly workforce schedul
 14. ~~Phase 4 - Notifications System (shift changes, leave status, swap requests, reminders)~~ ✅
 15. ~~Phase 2.2 - Copy and Paste Shifts (context menu, keyboard shortcuts)~~ ✅
 16. ~~Phase 2.3 - Recurring Shift Templates (daily/weekly/monthly, edit/delete scope)~~ ✅
+17. ~~Phase 2.4 - Schedule History (audit trail, timeline view, filtering)~~ ✅
 
 ### Up Next
 
-17. **Phase 2.4** - Schedule History
-18. **Phase 2.6** - Labor Cost Budgeting
 18. **Phase 2.6** - Labor Cost Budgeting
 19. **Phase 2.7** - Print Schedule
 20. **Phase 7** - AI Scheduling *(Premium)*

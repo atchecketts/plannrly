@@ -104,6 +104,11 @@ class Shift extends Model
         return $this->hasMany(ShiftSwapRequest::class, 'target_shift_id');
     }
 
+    public function history(): HasMany
+    {
+        return $this->hasMany(ScheduleHistory::class);
+    }
+
     public function isAssigned(): bool
     {
         return $this->user_id !== null;
